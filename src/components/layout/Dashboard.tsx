@@ -1,41 +1,29 @@
 import { NavLink, Routes, Route, Navigate } from 'react-router-dom'
+import { BarChart3, TrendingUp, LayoutList } from 'lucide-react'
 import { Header } from './Header'
-import { LayoutList, BarChart3, TrendingUp } from 'lucide-react'
+import { GlobalInputs } from '@/components/inputs/GlobalInputs'
+import { MacroForecasts } from '@/components/inputs/MacroForecasts'
+import type { MixId } from '@/types/mix'
 
 // ---------------------------------------------------------------------------
 // Tab configuration
 // ---------------------------------------------------------------------------
 const TABS = [
-  { to: '/mix-a',      label: "תמהיל א'",        icon: LayoutList },
-  { to: '/mix-b',      label: "תמהיל ב'",        icon: BarChart3 },
-  { to: '/investment', label: 'מחשבון השקעה',    icon: TrendingUp },
+  { to: '/mix-a',      label: "תמהיל א'",     icon: LayoutList, mixId: 'a' as MixId },
+  { to: '/mix-b',      label: "תמהיל ב'",     icon: BarChart3,  mixId: 'b' as MixId },
+  { to: '/investment', label: 'מחשבון השקעה', icon: TrendingUp, mixId: null },
 ] as const
 
 // ---------------------------------------------------------------------------
-// Placeholder card — used inside tab content areas
+// Output placeholder card (Stage 5 will replace these)
 // ---------------------------------------------------------------------------
-function PlaceholderCard({
-  title,
-  subtitle,
-  accent = false,
-}: {
-  title: string
-  subtitle: string
-  accent?: boolean
-}) {
+function OutputCard({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div
-      className={[
-        'rounded-xl border p-5 flex flex-col gap-1 h-full',
-        accent
-          ? 'bg-kumu-bg-light dark:bg-kumu-navy border-kumu-blue/20'
-          : 'bg-white dark:bg-kumu-surface-dark border-gray-100 dark:border-kumu-navy-light',
-      ].join(' ')}
-    >
-      <p className="text-xs font-medium text-kumu-blue uppercase tracking-widest">
+    <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark p-4 flex flex-col gap-1">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-kumu-blue">
         {title}
       </p>
-      <p className="text-sm text-kumu-navy-light dark:text-kumu-blue-lighter">
+      <p className="text-xs text-kumu-navy-light dark:text-kumu-blue-lighter">
         {subtitle}
       </p>
     </div>
@@ -43,51 +31,35 @@ function PlaceholderCard({
 }
 
 // ---------------------------------------------------------------------------
-// Split layout — 40% inputs | 60% outputs (RTL: inputs on right, outputs on left)
+// Mix tab — 40% inputs | 60% outputs (RTL: inputs on right, outputs on left)
 // ---------------------------------------------------------------------------
-function MixTabContent({ mixLabel }: { mixLabel: string }) {
+function MixTabContent({ mixId }: { mixId: MixId }) {
   return (
-    <div className="flex-1 grid grid-cols-[2fr_3fr] gap-4 p-4 min-h-0">
-      {/* Inputs column — 40%, appears on right in RTL */}
+    <div className="flex-1 grid grid-cols-[2fr_3fr] gap-4 p-4 min-h-0 overflow-hidden">
+
+      {/* Inputs column — 40%, appears on RIGHT in RTL */}
       <div className="flex flex-col gap-3 overflow-y-auto">
-        <PlaceholderCard
-          title="קלטים כלליים"
-          subtitle={`שווי נכס, הון עצמי וסטטוס רכישה — ${mixLabel}`}
-          accent
-        />
-        <PlaceholderCard
-          title="תחזיות מקרו"
-          subtitle="אינפלציה, פריים, SOFR ו-EURIBOR"
-        />
-        <PlaceholderCard
-          title="מסלולי הלוואה"
-          subtitle="הגדרת מסלולים, ריביות ולוחות סילוקין"
-          accent
-        />
-        <PlaceholderCard
-          title="פירעון מוקדם"
-          subtitle="אירועי פירעון מוקדם לאורך חיי המשכנתא"
-        />
+        <GlobalInputs  mixId={mixId} />
+        <MacroForecasts mixId={mixId} />
       </div>
 
-      {/* Outputs column — 60%, appears on left in RTL */}
+      {/* Outputs column — 60%, appears on LEFT in RTL */}
       <div className="flex flex-col gap-3 overflow-y-auto">
-        <PlaceholderCard
+        <OutputCard
           title="KPI — מדדי מפתח"
-          subtitle="החזר ראשון, מקסימלי, סך ריבית והצמדה"
-          accent
+          subtitle="החזר ראשון, מקסימלי, סך ריבית והצמדה — יחושבו בשלב 5"
         />
-        <PlaceholderCard
+        <OutputCard
           title="גרף התפתחות ההחזר"
-          subtitle="החזר חודשי לאורך כל תקופת המשכנתא"
+          subtitle="החזר חודשי לאורך כל תקופת המשכנתא — יחושב בשלב 5"
         />
-        <PlaceholderCard
+        <OutputCard
           title="התפלגות התמהיל"
-          subtitle="אחוז כל מסלול מסך המשכנתא"
+          subtitle="אחוז כל מסלול מסך המשכנתא — יחושב בשלב 5"
         />
-        <PlaceholderCard
+        <OutputCard
           title="טבלת סילוקין"
-          subtitle="פירוט חודשי מלא: קרן, ריבית, הצמדה, יתרה"
+          subtitle="פירוט חודשי: קרן, ריבית, הצמדה, יתרה — יחושב בשלב 5"
         />
       </div>
     </div>
@@ -95,31 +67,21 @@ function MixTabContent({ mixLabel }: { mixLabel: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Investment tab content — full-width layout
+// Investment tab — placeholder until Stage 6
 // ---------------------------------------------------------------------------
 function InvestmentTabContent() {
   return (
-    <div className="flex-1 grid grid-cols-[2fr_3fr] gap-4 p-4 min-h-0">
+    <div className="flex-1 grid grid-cols-[2fr_3fr] gap-4 p-4 min-h-0 overflow-hidden">
       <div className="flex flex-col gap-3 overflow-y-auto">
-        <PlaceholderCard
+        <OutputCard
           title="פרמטרי השקעה"
-          subtitle="הון ראשוני, הפקדה חודשית, תקופה ותשואה"
-          accent
-        />
-        <PlaceholderCard
-          title="מס רווחי הון"
-          subtitle="שיעור המס על רווחי ההשקעה"
+          subtitle="הון ראשוני, הפקדה חודשית, תשואה ומס — יבנה בשלב 6"
         />
       </div>
       <div className="flex flex-col gap-3 overflow-y-auto">
-        <PlaceholderCard
-          title="תוצאות ההשקעה"
-          subtitle="שווי תיק, סך הפקדות ורווח ריאלי נטו"
-          accent
-        />
-        <PlaceholderCard
-          title="מטריצת החלטה"
-          subtitle="השוואה כלכלית: עלות המשכנתא מול תשואת ההשקעה"
+        <OutputCard
+          title="תוצאות ומטריצת החלטה"
+          subtitle="השוואת עלות המשכנתא מול תשואת ההשקעה — יבנה בשלב 6"
         />
       </div>
     </div>
@@ -127,15 +89,15 @@ function InvestmentTabContent() {
 }
 
 // ---------------------------------------------------------------------------
-// Dashboard — main shell with header, tabs and route content
+// Dashboard — main shell
 // ---------------------------------------------------------------------------
 export function Dashboard() {
   return (
-    <div className="min-h-screen flex flex-col bg-kumu-bg-light dark:bg-kumu-bg-dark">
+    <div className="h-screen flex flex-col bg-kumu-bg-light dark:bg-kumu-bg-dark overflow-hidden">
       <Header />
 
       {/* Tab navigation */}
-      <nav className="flex-shrink-0 flex items-stretch gap-0 bg-white dark:bg-kumu-surface-dark border-b border-gray-100 dark:border-kumu-navy-light px-6">
+      <nav className="flex-shrink-0 flex items-stretch bg-white dark:bg-kumu-surface-dark border-b border-gray-100 dark:border-kumu-navy-light px-6">
         {TABS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
@@ -155,11 +117,11 @@ export function Dashboard() {
         ))}
       </nav>
 
-      {/* Route content */}
+      {/* Route content — fills remaining height */}
       <div className="flex-1 flex flex-col min-h-0">
         <Routes>
-          <Route path="/mix-a"      element={<MixTabContent mixLabel="תמהיל א'" />} />
-          <Route path="/mix-b"      element={<MixTabContent mixLabel="תמהיל ב'" />} />
+          <Route path="/mix-a"      element={<MixTabContent mixId="a" />} />
+          <Route path="/mix-b"      element={<MixTabContent mixId="b" />} />
           <Route path="/investment" element={<InvestmentTabContent />} />
           <Route path="*"           element={<Navigate to="/mix-a" replace />} />
         </Routes>
