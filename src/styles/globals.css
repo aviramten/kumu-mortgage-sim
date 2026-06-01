@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@theme {
+  /* KUMU Navy */
+  --color-kumu-navy: #1A2456;
+  --color-kumu-navy-light: #2D3D7A;
+  --color-kumu-navy-dark: #0F1633;
+
+  /* KUMU Blue */
+  --color-kumu-blue: #3B5BDB;
+  --color-kumu-blue-light: #5B7BFF;
+  --color-kumu-blue-lighter: #A5B8FF;
+
+  /* KUMU Backgrounds */
+  --color-kumu-bg-light: #F4F7FB;
+  --color-kumu-bg-white: #FFFFFF;
+  --color-kumu-bg-dark: #0F1633;
+  --color-kumu-surface-dark: #1A2456;
+
+  /* KUMU Semantic */
+  --color-kumu-coral: #E87A5D;
+  --color-kumu-green: #5BB572;
+  --color-kumu-purple: #A879E0;
+  --color-kumu-yellow: #F5D547;
+
+  /* Semantic aliases */
+  --color-kumu-error: #DC3545;
+  --color-kumu-warning: #F5D547;
+  --color-kumu-success: #5BB572;
+  --color-kumu-info: #3B5BDB;
+
+  /* Typography */
+  --font-family-sans: 'Heebo', sans-serif;
+
+  /* Border radius */
+  --radius-card: 12px;
+  --radius-modal: 16px;
+}
+
+/* Dark mode via .dark class on ancestor */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Global base styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Heebo', sans-serif;
+  line-height: 1.5;
+  direction: rtl;
+  min-width: 1280px;
+}
+
+/* Tabular numbers for KPI and tables */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
