@@ -16,6 +16,10 @@ export interface MixKPIs {
   totalIndexation: number
   /** totalCost ÷ total mortgage principal  (e.g. 1.48) */
   costPerShekel: number
+  /** Total interest saved vs. no-prepayment baseline (0 when no prepayments) */
+  prepaymentSavings: number
+  /** Months eliminated from the longest track by prepayments (0 when no prepayments) */
+  monthsSaved: number
 }
 
 // ---------------------------------------------------------------------------

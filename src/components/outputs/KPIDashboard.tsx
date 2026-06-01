@@ -119,7 +119,8 @@ export function KPIDashboard({ mixId }: KPIDashboardProps) {
     [mix.tracks, mix.macroForecasts, mix.prepayments],
   )
 
-  const hasCalculableTracks = result.trackResults.length > 0
+  const hasCalculableTracks  = result.trackResults.length > 0
+  const hasPrepayments       = mix.prepayments.length > 0
 
   return (
     <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
@@ -180,6 +181,23 @@ export function KPIDashboard({ mixId }: KPIDashboardProps) {
               value={`${formatNumber(result.kpis.costPerShekel)} ₪`}
               tooltip="על כל שקל שלווית, תחזיר לבנק סכום זה בסוף הדרך. פחות = עסקה טובה יותר."
             />
+
+            {hasPrepayments && (
+              <KpiCard
+                label="חיסכון מפירעון מוקדם"
+                value={formatCurrencyWhole(result.kpis.prepaymentSavings)}
+                tooltip="סכום הריבית שנחסך הודות לפירעונות המוקדמים, בהשוואה לתוכנית ההחזר המקורית."
+                accent="highlight"
+              />
+            )}
+
+            {hasPrepayments && (
+              <KpiCard
+                label="חודשים שנחסכו"
+                value={`${result.kpis.monthsSaved}`}
+                tooltip="מספר החודשים בהם קוצרה תקופת המשכנתא בפועל הודות לפירעונות המוקדמים."
+              />
+            )}
 
           </div>
         )}

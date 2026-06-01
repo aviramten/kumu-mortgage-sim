@@ -17,4 +17,8 @@ export interface MacroForecasts {
   euriborRate: number
   bankMarginUSD: number
   bankMarginEUR: number
+  /** Annual % change forecast for SOFR rate (Stage 4b) */
+  annualSOFRChange: number
+  /** Annual % change forecast for EURIBOR rate (Stage 4b) */
+  annualEURIBORChange: number
 }

@@ -5,7 +5,9 @@ import type { LoanTrack, PrepaymentEvent } from '@/types/track'
 import {
   DEFAULT_ANNUAL_CPI,
   DEFAULT_ANNUAL_EUR_CHANGE,
+  DEFAULT_ANNUAL_EURIBOR_CHANGE,
   DEFAULT_ANNUAL_PRIME_CHANGE,
+  DEFAULT_ANNUAL_SOFR_CHANGE,
   DEFAULT_ANNUAL_USD_CHANGE,
   DEFAULT_BANK_MARGIN_EUR,
   DEFAULT_BANK_MARGIN_USD,
@@ -27,14 +29,16 @@ const defaultGlobalInputs: GlobalInputs = {
 }
 
 const defaultMacroForecasts: MacroForecasts = {
-  annualCPI:         DEFAULT_ANNUAL_CPI,
-  annualPrimeChange: DEFAULT_ANNUAL_PRIME_CHANGE,
-  annualUSDChange:   DEFAULT_ANNUAL_USD_CHANGE,
-  annualEURChange:   DEFAULT_ANNUAL_EUR_CHANGE,
-  sofrRate:          DEFAULT_SOFR_RATE,
-  euriborRate:       DEFAULT_EURIBOR_RATE,
-  bankMarginUSD:     DEFAULT_BANK_MARGIN_USD,
-  bankMarginEUR:     DEFAULT_BANK_MARGIN_EUR,
+  annualCPI:            DEFAULT_ANNUAL_CPI,
+  annualPrimeChange:    DEFAULT_ANNUAL_PRIME_CHANGE,
+  annualUSDChange:      DEFAULT_ANNUAL_USD_CHANGE,
+  annualEURChange:      DEFAULT_ANNUAL_EUR_CHANGE,
+  sofrRate:             DEFAULT_SOFR_RATE,
+  euriborRate:          DEFAULT_EURIBOR_RATE,
+  bankMarginUSD:        DEFAULT_BANK_MARGIN_USD,
+  bankMarginEUR:        DEFAULT_BANK_MARGIN_EUR,
+  annualSOFRChange:     DEFAULT_ANNUAL_SOFR_CHANGE,
+  annualEURIBORChange:  DEFAULT_ANNUAL_EURIBOR_CHANGE,
 }
 
 const createDefaultMix = (id: MixId): Mix => ({

@@ -12,6 +12,10 @@ export const DEFAULT_EURIBOR_RATE = 2.75;       // % — European Money Markets 
 export const DEFAULT_BANK_MARGIN_USD = 2.5;     // % — typical Israeli bank spread
 export const DEFAULT_BANK_MARGIN_EUR = 2.5;     // % — typical Israeli bank spread
 
+// FX benchmark rate change forecasts (Stage 4b)
+export const DEFAULT_ANNUAL_SOFR_CHANGE    = 0;  // % — no change assumed
+export const DEFAULT_ANNUAL_EURIBOR_CHANGE = 0;  // % — no change assumed
+
 // Prime rate
 export const DEFAULT_PRIME_RATE = 6.0;          // % — Bank of Israel base rate + 1.5%
 

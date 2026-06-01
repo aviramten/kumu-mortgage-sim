@@ -15,14 +15,16 @@ import type { MacroForecasts }  from '@/types/macro'
 // Shared macro fixture with zero prime-change (not relevant for these tests)
 // ---------------------------------------------------------------------------
 const MACRO_ZERO_CPI: MacroForecasts = {
-  annualCPI:          0,
-  annualPrimeChange:  0,
-  annualUSDChange:    0,
-  annualEURChange:    0,
-  sofrRate:           3.6,
-  euriborRate:        2.75,
-  bankMarginUSD:      2.5,
-  bankMarginEUR:      2.5,
+  annualCPI:           0,
+  annualPrimeChange:   0,
+  annualUSDChange:     0,
+  annualEURChange:     0,
+  sofrRate:            3.6,
+  euriborRate:         2.75,
+  bankMarginUSD:       2.5,
+  bankMarginEUR:       2.5,
+  annualSOFRChange:    0,
+  annualEURIBORChange: 0,
 }
 
 const MACRO_2_5_CPI: MacroForecasts = {
@@ -198,5 +200,226 @@ describe('Test #3 — CPI-indexed Spitzer (fixed-linked, CPI = 2.5 %)', () => {
 
   it('total payment > total indexation (interest + principal dominate)', () => {
     expect(result.totalPayment).toBeGreaterThan(result.totalIndexation)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Additional macro fixture with 2.5% CPI and rate data for FX/grace tests
+// ---------------------------------------------------------------------------
+const MACRO_FULL: MacroForecasts = {
+  annualCPI:           2.5,
+  annualPrimeChange:   0,
+  annualUSDChange:     3.0,   // USD appreciates 3% / yr vs ILS
+  annualEURChange:     0,
+  sofrRate:            3.6,
+  euriborRate:         2.75,
+  bankMarginUSD:       2.5,
+  bankMarginEUR:       2.5,
+  annualSOFRChange:    0,
+  annualEURIBORChange: 0,
+}
+
+// ---------------------------------------------------------------------------
+// Test #4 — PRD §4.7 — CPI-indexed Spitzer after 24-month grace (partial)
+// Input: amount=400,000 | months=240 | annualRate=3.0% | spitzer | CPI=2.5%
+//        graceType=partial | graceMonths=24
+// Expected:
+//   month_1.principalPayment = 0  (partial grace — interest only)
+//   month_1.interestPayment  > 0
+//   month_1.closingBalance   ≈ 400,000 (no principal reduction during grace)
+//   month_25.principalPayment > 0  (normal amortisation resumes)
+//   month_240.closingBalance = 0
+//   openingBalance(month 25) > 400,000  (CPI has grown balance over 24 months)
+// ---------------------------------------------------------------------------
+describe('Test #4 — Partial grace 24m then CPI-indexed Spitzer (fixed-linked)', () => {
+  const track = makeTrack({
+    type:        'fixed-linked',
+    amount:      400_000,
+    months:      240,
+    annualRate:  3.0,
+    schedule:    'spitzer',
+    graceType:   'partial',
+    graceMonths: 24,
+  })
+  const result = calculateTrack(track, MACRO_FULL)
+
+  it('produces exactly 240 rows', () => {
+    expect(result.rows).toHaveLength(240)
+  })
+
+  it('month 1 — principal payment is 0 during partial grace', () => {
+    expect(result.rows[0].principalPayment).toBe(0)
+  })
+
+  it('month 1 — interest payment > 0 during partial grace', () => {
+    expect(result.rows[0].interestPayment).toBeGreaterThan(0)
+  })
+
+  it('month 1 — closing balance ≈ 400,000 (balance unchanged in partial grace)', () => {
+    expect(result.rows[0].closingBalance).toBeGreaterThan(399_000)
+    expect(result.rows[0].closingBalance).toBeLessThan(402_000)
+  })
+
+  it('month 24 — still in grace (principal still 0)', () => {
+    expect(result.rows[23].principalPayment).toBe(0)
+  })
+
+  it('month 25 — principal payment > 0 (amortisation resumes)', () => {
+    expect(result.rows[24].principalPayment).toBeGreaterThan(0)
+  })
+
+  it('month 25 — opening balance > 400,000 (CPI accumulated over 24 months)', () => {
+    expect(result.rows[24].openingBalance).toBeGreaterThan(400_000)
+  })
+
+  it('month 240 — closing balance is 0', () => {
+    expect(result.rows[239].closingBalance).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Test #5 — PRD §4.7 — Full grace 12 months (interest capitalises)
+// Input: amount=300,000 | months=120 | annualRate=4% | spitzer | no CPI
+//        graceType=full | graceMonths=12
+// Expected:
+//   month_1.totalPayment = 0  (nothing paid during full grace)
+//   month_1.closingBalance > 300,000  (interest accrues into principal)
+//   month_13.openingBalance > 300,000 (compounded balance at grace end)
+//   month_13.principalPayment > 0     (amortisation starts)
+//   month_120.closingBalance = 0
+// ---------------------------------------------------------------------------
+describe('Test #5 — Full grace 12m (interest capitalises, fixed-unlinked)', () => {
+  const track = makeTrack({
+    type:        'fixed-unlinked',
+    amount:      300_000,
+    months:      120,
+    annualRate:  4.0,
+    schedule:    'spitzer',
+    graceType:   'full',
+    graceMonths: 12,
+  })
+  const result = calculateTrack(track, MACRO_ZERO_CPI)
+
+  it('month 1 — total payment = 0 during full grace', () => {
+    expect(result.rows[0].totalPayment).toBe(0)
+  })
+
+  it('month 1 — closing balance > 300,000 (interest accrues)', () => {
+    expect(result.rows[0].closingBalance).toBeGreaterThan(300_000)
+  })
+
+  it('month 12 — total payment = 0 (still in full grace)', () => {
+    expect(result.rows[11].totalPayment).toBe(0)
+  })
+
+  it('month 13 — opening balance > 300,000 (12 months of compounding)', () => {
+    expect(result.rows[12].openingBalance).toBeGreaterThan(300_000)
+  })
+
+  it('month 13 — principal payment > 0 (amortisation resumes)', () => {
+    expect(result.rows[12].principalPayment).toBeGreaterThan(0)
+  })
+
+  it('month 120 — closing balance is 0', () => {
+    expect(result.rows[119].closingBalance).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Test #6 — PRD §4.7 — USD FX-indexed track (SOFR-based, 3% USD appreciation)
+// Input: amount=500,000 | months=120 | annualRate=6.1% (SOFR 3.6 + margin 2.5)
+//        type=usd | schedule=spitzer | annualUSDChange=3%
+// Expected:
+//   month_1.inflationComponent > 0  (FX indexation applied)
+//   month_1.indexedBalance > 500,000
+//   month_120.closingBalance = 0
+//   totalIndexation > 0
+//   totalPayment > 500,000 * 1.3  (USD appreciation inflates total cost)
+// ---------------------------------------------------------------------------
+describe('Test #6 — USD FX-indexed Spitzer (3% annual USD appreciation)', () => {
+  const track = makeTrack({
+    type:       'usd',
+    amount:     500_000,
+    months:     120,
+    annualRate: 6.1,    // SOFR 3.6 + bankMarginUSD 2.5
+    schedule:   'spitzer',
+  })
+  const result = calculateTrack(track, MACRO_FULL)
+
+  it('produces exactly 120 rows', () => {
+    expect(result.rows).toHaveLength(120)
+  })
+
+  it('month 1 — FX indexation component > 0', () => {
+    expect(result.rows[0].inflationComponent).toBeGreaterThan(0)
+  })
+
+  it('month 1 — indexed balance > 500,000', () => {
+    expect(result.rows[0].indexedBalance).toBeGreaterThan(500_000)
+  })
+
+  it('total indexation > 0 (FX appreciation inflates balance)', () => {
+    expect(result.totalIndexation).toBeGreaterThan(0)
+  })
+
+  it('month 120 — closing balance is 0', () => {
+    expect(result.rows[119].closingBalance).toBe(0)
+  })
+
+  it('total payment > non-FX equivalent (FX appreciation adds cost)', () => {
+    const noFxResult = calculateTrack(
+      { ...track, type: 'fixed-unlinked' },
+      MACRO_ZERO_CPI,
+    )
+    expect(result.totalPayment).toBeGreaterThan(noFxResult.totalPayment)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Test #7 — PRD §4.7 — Prepayment shortenTerm
+// Input: amount=600,000 | months=240 | annualRate=4.5% | spitzer
+//        prepayment at month 24: amount=100,000, mode=shortenTerm
+// Expected:
+//   month_25.openingBalance < month_24.closingBalance (balance reduced)
+//   effectiveMonths < 240   (loan ends before full term)
+//   totalInterest_with_prepayment < totalInterest_without_prepayment
+// ---------------------------------------------------------------------------
+describe('Test #7 — Prepayment shortenTerm (spitzer, fixed-unlinked)', () => {
+  const track = makeTrack({
+    type:       'fixed-unlinked',
+    amount:     600_000,
+    months:     240,
+    annualRate: 4.5,
+    schedule:   'spitzer',
+  })
+
+  const prepayments = [
+    {
+      id:      'pp-1',
+      month:   24,
+      amount:  100_000,
+      trackId: 'test-track',
+      mode:    'shortenTerm' as const,
+    },
+  ]
+
+  const resultWith    = calculateTrack(track, MACRO_ZERO_CPI, prepayments)
+  const resultWithout = calculateTrack(track, MACRO_ZERO_CPI, [])
+
+  it('effectiveMonths < 240 (loan shortened)', () => {
+    expect(resultWith.effectiveMonths).toBeLessThan(240)
+  })
+
+  it('totalInterest is lower with prepayment than without', () => {
+    expect(resultWith.totalInterest).toBeLessThan(resultWithout.totalInterest)
+  })
+
+  it('month 25 opening balance is lower with prepayment', () => {
+    expect(resultWith.rows[24].openingBalance).toBeLessThan(resultWithout.rows[24].openingBalance)
+  })
+
+  it('closing balance of last row is 0', () => {
+    const lastRow = resultWith.rows[resultWith.rows.length - 1]
+    expect(lastRow.closingBalance).toBe(0)
   })
 })

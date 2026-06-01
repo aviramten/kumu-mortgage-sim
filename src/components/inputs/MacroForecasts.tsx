@@ -169,7 +169,7 @@ const SECTION_FX: FieldConfig[] = [
   },
 ]
 
-const SECTION_RATES: FieldConfig[] = [
+const SECTION_RATES_BASE: FieldConfig[] = [
   {
     key:     'sofrRate',
     label:   'ריבית SOFR נוכחית',
@@ -196,6 +196,21 @@ const SECTION_RATES: FieldConfig[] = [
   },
 ]
 
+const SECTION_RATES_FX_CHANGE: FieldConfig[] = [
+  {
+    key:     'annualSOFRChange',
+    label:   'צפי שינוי SOFR שנתי',
+    tooltip: 'שינוי שנתי צפוי בריבית ה-SOFR. ריבית ה-SOFR מתעדכנת כל 12 חודש במסלולי הדולר.',
+    step: 0.25, min: -5, max: 10,
+  },
+  {
+    key:     'annualEURIBORChange',
+    label:   'צפי שינוי EURIBOR שנתי',
+    tooltip: 'שינוי שנתי צפוי בריבית ה-EURIBOR. ריבית ה-EURIBOR מתעדכנת כל 12 חודש במסלולי היורו.',
+    step: 0.25, min: -5, max: 10,
+  },
+]
+
 // ---------------------------------------------------------------------------
 // Section wrapper
 // ---------------------------------------------------------------------------
@@ -219,8 +234,11 @@ interface MacroForecastsProps {
 
 export function MacroForecasts({ mixId }: MacroForecastsProps) {
   const [open, setOpen] = useState(false)
-  const { macroForecasts }   = useMix(mixId)
+  const mix                  = useMix(mixId)
+  const { macroForecasts }   = mix
   const updateMacroForecasts = useMixStore((s) => s.updateMacroForecasts)
+
+  const hasFxTracks = mix.tracks.some((t) => t.type === 'usd' || t.type === 'eur')
 
   const update = (key: keyof MacroForecastsType, value: number) => {
     updateMacroForecasts(mixId, { [key]: value })
@@ -270,8 +288,17 @@ export function MacroForecasts({ mixId }: MacroForecastsProps) {
           <div className="h-px bg-gray-100 dark:bg-kumu-navy-light" />
 
           <Section title="ריביות בנצ'מרק">
-            {SECTION_RATES.map(renderField)}
+            {SECTION_RATES_BASE.map(renderField)}
           </Section>
+
+          {hasFxTracks && (
+            <>
+              <div className="h-px bg-gray-100 dark:bg-kumu-navy-light" />
+              <Section title="צפי שינוי ריביות מט&quot;ח">
+                {SECTION_RATES_FX_CHANGE.map(renderField)}
+              </Section>
+            </>
+          )}
         </div>
       )}
     </div>
