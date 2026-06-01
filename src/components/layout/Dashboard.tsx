@@ -5,6 +5,7 @@ import { GlobalInputs } from '@/components/inputs/GlobalInputs'
 import { MacroForecasts } from '@/components/inputs/MacroForecasts'
 import { TracksManager } from '@/components/tracks/TracksManager'
 import { PrepaymentEvents } from '@/components/tracks/PrepaymentEvents'
+import { KPIDashboard } from '@/components/outputs/KPIDashboard'
 import type { MixId } from '@/types/mix'
 
 // ---------------------------------------------------------------------------
@@ -49,10 +50,7 @@ function MixTabContent({ mixId }: { mixId: MixId }) {
 
       {/* Outputs column — 60%, appears on LEFT in RTL */}
       <div className="flex flex-col gap-3 overflow-y-auto">
-        <OutputCard
-          title="KPI — מדדי מפתח"
-          subtitle="החזר ראשון, מקסימלי, סך ריבית והצמדה — יחושבו בשלב 5"
-        />
+        <KPIDashboard mixId={mixId} />
         <OutputCard
           title="גרף התפתחות ההחזר"
           subtitle="החזר חודשי לאורך כל תקופת המשכנתא — יחושב בשלב 5"
