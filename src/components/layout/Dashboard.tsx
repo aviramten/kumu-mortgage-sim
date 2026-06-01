@@ -3,6 +3,8 @@ import { BarChart3, TrendingUp, LayoutList } from 'lucide-react'
 import { Header } from './Header'
 import { GlobalInputs } from '@/components/inputs/GlobalInputs'
 import { MacroForecasts } from '@/components/inputs/MacroForecasts'
+import { TracksManager } from '@/components/tracks/TracksManager'
+import { PrepaymentEvents } from '@/components/tracks/PrepaymentEvents'
 import type { MixId } from '@/types/mix'
 
 // ---------------------------------------------------------------------------
@@ -39,8 +41,10 @@ function MixTabContent({ mixId }: { mixId: MixId }) {
 
       {/* Inputs column — 40%, appears on RIGHT in RTL */}
       <div className="flex flex-col gap-3 overflow-y-auto">
-        <GlobalInputs  mixId={mixId} />
-        <MacroForecasts mixId={mixId} />
+        <GlobalInputs    mixId={mixId} />
+        <MacroForecasts  mixId={mixId} />
+        <TracksManager   mixId={mixId} />
+        <PrepaymentEvents mixId={mixId} />
       </div>
 
       {/* Outputs column — 60%, appears on LEFT in RTL */}

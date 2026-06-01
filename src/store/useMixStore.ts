@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Mix, MixId } from '@/types/mix'
 import type { GlobalInputs, MacroForecasts } from '@/types/macro'
+import type { LoanTrack, PrepaymentEvent } from '@/types/track'
 import {
   DEFAULT_ANNUAL_CPI,
   DEFAULT_ANNUAL_EUR_CHANGE,
@@ -10,6 +11,7 @@ import {
   DEFAULT_BANK_MARGIN_USD,
   DEFAULT_EQUITY,
   DEFAULT_EURIBOR_RATE,
+  DEFAULT_PRIME_RATE,
   DEFAULT_PROPERTY_VALUE,
   DEFAULT_SOFR_RATE,
 } from '@/utils/constants'
@@ -25,14 +27,14 @@ const defaultGlobalInputs: GlobalInputs = {
 }
 
 const defaultMacroForecasts: MacroForecasts = {
-  annualCPI:        DEFAULT_ANNUAL_CPI,
+  annualCPI:         DEFAULT_ANNUAL_CPI,
   annualPrimeChange: DEFAULT_ANNUAL_PRIME_CHANGE,
-  annualUSDChange:  DEFAULT_ANNUAL_USD_CHANGE,
-  annualEURChange:  DEFAULT_ANNUAL_EUR_CHANGE,
-  sofrRate:         DEFAULT_SOFR_RATE,
-  euriborRate:      DEFAULT_EURIBOR_RATE,
-  bankMarginUSD:    DEFAULT_BANK_MARGIN_USD,
-  bankMarginEUR:    DEFAULT_BANK_MARGIN_EUR,
+  annualUSDChange:   DEFAULT_ANNUAL_USD_CHANGE,
+  annualEURChange:   DEFAULT_ANNUAL_EUR_CHANGE,
+  sofrRate:          DEFAULT_SOFR_RATE,
+  euriborRate:       DEFAULT_EURIBOR_RATE,
+  bankMarginUSD:     DEFAULT_BANK_MARGIN_USD,
+  bankMarginEUR:     DEFAULT_BANK_MARGIN_EUR,
 }
 
 const createDefaultMix = (id: MixId): Mix => ({
@@ -45,7 +47,7 @@ const createDefaultMix = (id: MixId): Mix => ({
 })
 
 // ---------------------------------------------------------------------------
-// Store
+// Store interface
 // ---------------------------------------------------------------------------
 type MixKey = 'mixA' | 'mixB'
 const toKey = (id: MixId): MixKey => (id === 'a' ? 'mixA' : 'mixB')
@@ -53,14 +55,28 @@ const toKey = (id: MixId): MixKey => (id === 'a' ? 'mixA' : 'mixB')
 interface MixStore {
   mixA: Mix
   mixB: Mix
+  // Global inputs
   updateGlobalInputs:   (id: MixId, partial: Partial<GlobalInputs>)   => void
   updateMacroForecasts: (id: MixId, partial: Partial<MacroForecasts>) => void
+  // Track CRUD
+  addTrack:       (id: MixId) => void
+  removeTrack:    (id: MixId, trackId: string) => void
+  duplicateTrack: (id: MixId, trackId: string) => void
+  updateTrack:    (id: MixId, trackId: string, partial: Partial<LoanTrack>) => void
+  // Prepayment CRUD
+  addPrepayment:    (id: MixId, event: Omit<PrepaymentEvent, 'id'>) => void
+  removePrepayment: (id: MixId, eventId: string) => void
+  updatePrepayment: (id: MixId, eventId: string, partial: Partial<PrepaymentEvent>) => void
 }
 
+// ---------------------------------------------------------------------------
+// Store implementation
+// ---------------------------------------------------------------------------
 export const useMixStore = create<MixStore>()((set) => ({
   mixA: createDefaultMix('a'),
   mixB: createDefaultMix('b'),
 
+  // ---- Global inputs ----
   updateGlobalInputs: (id, partial) =>
     set((state) => {
       const key = toKey(id)
@@ -79,6 +95,102 @@ export const useMixStore = create<MixStore>()((set) => ({
         [key]: {
           ...state[key],
           macroForecasts: { ...state[key].macroForecasts, ...partial },
+        },
+      }
+    }),
+
+  // ---- Tracks ----
+  addTrack: (id) =>
+    set((state) => {
+      const key   = toKey(id)
+      const mix   = state[key]
+      // Default amount = remaining unallocated portion of the mortgage
+      const allocated = mix.tracks.reduce((sum, t) => sum + t.amount, 0)
+      const remaining = Math.max(0, mix.globalInputs.mortgageAmount - allocated)
+      const newTrack: LoanTrack = {
+        id:                   crypto.randomUUID(),
+        type:                 'prime',
+        amount:               remaining,
+        months:               240,
+        annualRate:           DEFAULT_PRIME_RATE,
+        schedule:             'spitzer',
+        graceType:            'none',
+        graceMonths:          0,
+        earlyRepaymentFee:    null,
+        feeCalculationMethod: null,
+      }
+      return { [key]: { ...mix, tracks: [...mix.tracks, newTrack] } }
+    }),
+
+  removeTrack: (id, trackId) =>
+    set((state) => {
+      const key = toKey(id)
+      const mix = state[key]
+      return {
+        [key]: {
+          ...mix,
+          // Remove the track and all prepayments that belong to it
+          tracks:      mix.tracks.filter((t) => t.id !== trackId),
+          prepayments: mix.prepayments.filter((p) => p.trackId !== trackId),
+        },
+      }
+    }),
+
+  duplicateTrack: (id, trackId) =>
+    set((state) => {
+      const key      = toKey(id)
+      const mix      = state[key]
+      const original = mix.tracks.find((t) => t.id === trackId)
+      if (!original) return {}
+      const duplicate: LoanTrack = { ...original, id: crypto.randomUUID() }
+      return { [key]: { ...mix, tracks: [...mix.tracks, duplicate] } }
+    }),
+
+  updateTrack: (id, trackId, partial) =>
+    set((state) => {
+      const key = toKey(id)
+      const mix = state[key]
+      return {
+        [key]: {
+          ...mix,
+          tracks: mix.tracks.map((t) =>
+            t.id === trackId ? { ...t, ...partial } : t,
+          ),
+        },
+      }
+    }),
+
+  // ---- Prepayments ----
+  addPrepayment: (id, event) =>
+    set((state) => {
+      const key      = toKey(id)
+      const mix      = state[key]
+      const newEvent: PrepaymentEvent = { ...event, id: crypto.randomUUID() }
+      return { [key]: { ...mix, prepayments: [...mix.prepayments, newEvent] } }
+    }),
+
+  removePrepayment: (id, eventId) =>
+    set((state) => {
+      const key = toKey(id)
+      const mix = state[key]
+      return {
+        [key]: {
+          ...mix,
+          prepayments: mix.prepayments.filter((p) => p.id !== eventId),
+        },
+      }
+    }),
+
+  updatePrepayment: (id, eventId, partial) =>
+    set((state) => {
+      const key = toKey(id)
+      const mix = state[key]
+      return {
+        [key]: {
+          ...mix,
+          prepayments: mix.prepayments.map((p) =>
+            p.id === eventId ? { ...p, ...partial } : p,
+          ),
         },
       }
     }),
