@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 // ---------------------------------------------------------------------------
 // Mock credentials — Stage 1 prototype only
@@ -17,18 +18,30 @@ interface AuthState {
   logout: () => void
 }
 
-export const useAuthStore = create<AuthState>()((set) => ({
-  isAuthenticated: false,
-  userEmail: null,
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      isAuthenticated: false,
+      userEmail: null,
 
-  login: (email: string, password: string): boolean => {
-    // TODO: Replace with supabase.auth.signInWithPassword()
-    if (email === MOCK_EMAIL && password === MOCK_PASSWORD) {
-      set({ isAuthenticated: true, userEmail: email })
-      return true
+      login: (email: string, password: string): boolean => {
+        // TODO: Replace with supabase.auth.signInWithPassword()
+        if (email === MOCK_EMAIL && password === MOCK_PASSWORD) {
+          set({ isAuthenticated: true, userEmail: email })
+          return true
+        }
+        return false
+      },
+
+      logout: () => set({ isAuthenticated: false, userEmail: null }),
+    }),
+    {
+      name: 'kumu-auth',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        isAuthenticated: state.isAuthenticated,
+        userEmail:       state.userEmail,
+      }),
     }
-    return false
-  },
-
-  logout: () => set({ isAuthenticated: false, userEmail: null }),
-}))
+  )
+)

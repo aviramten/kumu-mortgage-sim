@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Mix, MixId } from '@/types/mix'
 import type { GlobalInputs, MacroForecasts } from '@/types/macro'
 import type { LoanTrack, PrepaymentEvent } from '@/types/track'
@@ -79,7 +80,9 @@ interface MixStore {
 // ---------------------------------------------------------------------------
 // Store implementation
 // ---------------------------------------------------------------------------
-export const useMixStore = create<MixStore>()((set) => ({
+export const useMixStore = create<MixStore>()(
+  persist(
+    (set) => ({
   mixA: createDefaultMix('a'),
   mixB: createDefaultMix('b'),
 
@@ -219,7 +222,15 @@ export const useMixStore = create<MixStore>()((set) => ({
 
   clearMixB: () =>
     set(() => ({ mixB: createDefaultMix('b') })),
-}))
+    }),
+    {
+      name: 'kumu-mix-store',
+      storage: createJSONStorage(() => localStorage),
+      // Persist only data (mixA, mixB), not action functions
+      partialize: (state) => ({ mixA: state.mixA, mixB: state.mixB }),
+    }
+  )
+)
 
 /** Convenience selector — returns the full mix object for the given id */
 export const useMix = (id: MixId) =>
