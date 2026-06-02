@@ -39,3 +39,16 @@ export const BALANCE_WARN_THRESHOLD = 10_000;   // ₪ — yellow → orange
 // Default global inputs
 export const DEFAULT_PROPERTY_VALUE = 2_000_000;
 export const DEFAULT_EQUITY = 600_000;
+
+// Hebrew display labels for track types (used by charts and amortization table)
+export const TRACK_TYPE_LABELS: Record<string, string> = {
+  'prime':             'פריים',
+  'fixed-unlinked':    'קל"צ',
+  'fixed-linked':      'ק"צ',
+  'variable-linked':   'מ"צ',
+  'variable-unlinked': 'מל"צ',
+  'eligibility':       'זכאות',
+  'variable-makam':    'מק"מ',
+  'usd':               'דולר ($)',
+  'eur':               'יורו (€)',
+}

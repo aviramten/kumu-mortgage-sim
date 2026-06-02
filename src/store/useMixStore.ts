@@ -71,6 +71,9 @@ interface MixStore {
   addPrepayment:    (id: MixId, event: Omit<PrepaymentEvent, 'id'>) => void
   removePrepayment: (id: MixId, eventId: string) => void
   updatePrepayment: (id: MixId, eventId: string, partial: Partial<PrepaymentEvent>) => void
+  // Mix B management
+  cloneMixAtoB: () => void
+  clearMixB:    () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -198,6 +201,24 @@ export const useMixStore = create<MixStore>()((set) => ({
         },
       }
     }),
+
+  // ---- Mix B management ----
+  cloneMixAtoB: () =>
+    set((state) => ({
+      mixB: {
+        ...state.mixA,
+        id:      'b' as const,
+        // Deep-clone arrays to prevent shared references
+        tracks:      state.mixA.tracks.map((t) => ({ ...t, id: crypto.randomUUID() })),
+        prepayments: state.mixA.prepayments.map((p) => ({ ...p, id: crypto.randomUUID() })),
+        globalInputs:   { ...state.mixA.globalInputs },
+        macroForecasts: { ...state.mixA.macroForecasts },
+        results: null,
+      },
+    })),
+
+  clearMixB: () =>
+    set(() => ({ mixB: createDefaultMix('b') })),
 }))
 
 /** Convenience selector — returns the full mix object for the given id */

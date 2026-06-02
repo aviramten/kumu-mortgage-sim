@@ -1,2 +1,169 @@
-// Stage 5: Recharts donut chart — track distribution %
-export {}
+/**
+ * DistributionDonut — track allocation as a donut (% of mortgage).
+ * Placed in the outputs column; re-renders whenever tracks change.
+ */
+
+import { useMemo } from 'react'
+import {
+  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts'
+import { useThemeStore } from '@/store/useThemeStore'
+import { useMix } from '@/store/useMixStore'
+import { KUMU_CHART_COLORS } from '@/utils/chartTheme'
+import { TRACK_TYPE_LABELS } from '@/utils/constants'
+import { formatCurrencyWhole } from '@/utils/format'
+import type { MixId } from '@/types/mix'
+import type { LoanTrack } from '@/types/track'
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+interface SliceItem {
+  name:  string
+  value: number
+  type:  LoanTrack['type']
+  pct:   number
+}
+
+function buildSlices(tracks: LoanTrack[]): { slices: SliceItem[]; total: number } {
+  const total = tracks.reduce((s, t) => s + t.amount, 0)
+  const slices = tracks.map((t) => ({
+    name:  TRACK_TYPE_LABELS[t.type] ?? t.type,
+    value: t.amount,
+    type:  t.type,
+    pct:   total > 0 ? Math.round((t.amount / total) * 100) : 0,
+  }))
+  return { slices, total }
+}
+
+// Custom tooltip
+function CustomTooltip({ active, payload }: { active?: boolean; payload?: { payload: SliceItem }[] }) {
+  if (!active || !payload?.length) return null
+  const d = payload[0].payload
+  return (
+    <div
+      style={{
+        background: 'var(--tooltip-bg, #fff)',
+        border: '1px solid #E5E7EB',
+        borderRadius: 10,
+        padding: '10px 14px',
+        fontFamily: 'Heebo, sans-serif',
+        direction: 'rtl',
+      }}
+    >
+      <p className="font-semibold text-kumu-navy dark:text-white text-[13px]">{d.name}</p>
+      <p className="text-[12px] text-kumu-navy-light dark:text-kumu-blue-lighter">
+        {formatCurrencyWhole(d.value)} · {d.pct}%
+      </p>
+    </div>
+  )
+}
+
+// Custom legend renderer
+function CustomLegend({ payload }: { payload?: { value: string; color: string }[] }) {
+  if (!payload) return null
+  return (
+    <ul className="flex flex-col gap-1.5 pr-2">
+      {payload.map((entry) => (
+        <li key={entry.value} className="flex items-center gap-2">
+          <span
+            className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+            style={{ background: entry.color }}
+          />
+          <span className="text-[11px] text-kumu-navy dark:text-kumu-blue-lighter">
+            {entry.value}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Public component
+// ---------------------------------------------------------------------------
+interface DistributionDonutProps {
+  mixId: MixId
+}
+
+export function DistributionDonut({ mixId }: DistributionDonutProps) {
+  const mix = useMix(mixId)
+  const { theme } = useThemeStore()
+  const isDark = theme === 'dark'
+
+  const { slices, total } = useMemo(
+    () => buildSlices(mix.tracks),
+    [mix.tracks],
+  )
+
+  const isEmpty = slices.length === 0
+
+  return (
+    <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-gray-100 dark:border-kumu-navy-light">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
+          התפלגות התמהיל
+        </h2>
+      </div>
+
+      <div className="p-3">
+        {isEmpty ? (
+          <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+            <p className="text-sm text-kumu-navy-light dark:text-kumu-blue-lighter">
+              הוסף מסלולים לתמהיל כדי לראות את ההתפלגות
+            </p>
+          </div>
+        ) : (
+          <div className="relative" style={{ height: 220 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={slices}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="40%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={95}
+                  paddingAngle={2}
+                  animationDuration={800}
+                >
+                  {slices.map((s, i) => (
+                    <Cell
+                      key={`cell-${i}`}
+                      fill={KUMU_CHART_COLORS[s.type]}
+                      stroke={isDark ? '#0F1633' : '#fff'}
+                      strokeWidth={2}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+                <Legend
+                  layout="vertical"
+                  align="right"
+                  verticalAlign="middle"
+                  content={<CustomLegend />}
+                  formatter={(value) => value}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+
+            {/* Center label — positioned over chart centre (40% of width) */}
+            <div
+              className="absolute top-1/2 -translate-y-1/2 text-center pointer-events-none"
+              style={{ left: '40%', transform: 'translate(-50%, -50%)' }}
+            >
+              <p className="text-base font-bold text-kumu-navy dark:text-white tabular-nums leading-tight">
+                {formatCurrencyWhole(total)}
+              </p>
+              <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter">
+                סך הקרן
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

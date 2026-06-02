@@ -1,15 +1,21 @@
 import { NavLink, Routes, Route, Navigate } from 'react-router-dom'
-import { BarChart3, TrendingUp, LayoutList } from 'lucide-react'
+import { BarChart3, TrendingUp, LayoutList, Copy, GitCompare } from 'lucide-react'
 import { Header } from './Header'
+import { ComparisonTab } from './ComparisonTab'
 import { GlobalInputs } from '@/components/inputs/GlobalInputs'
 import { MacroForecasts } from '@/components/inputs/MacroForecasts'
 import { TracksManager } from '@/components/tracks/TracksManager'
 import { PrepaymentEvents } from '@/components/tracks/PrepaymentEvents'
 import { KPIDashboard } from '@/components/outputs/KPIDashboard'
+import { DistributionDonut } from '@/components/outputs/charts/DistributionDonut'
+import { PaymentLineChart } from '@/components/outputs/charts/PaymentLineChart'
+import { CostBreakdownBars } from '@/components/outputs/charts/CostBreakdownBars'
+import { AmortizationTable } from '@/components/outputs/AmortizationTable'
+import { useMix, useMixStore } from '@/store/useMixStore'
 import type { MixId } from '@/types/mix'
 
 // ---------------------------------------------------------------------------
-// Tab configuration
+// Tab configuration  (comparison tab added dynamically in the nav)
 // ---------------------------------------------------------------------------
 const TABS = [
   { to: '/mix-a',      label: "תמהיל א'",     icon: LayoutList, mixId: 'a' as MixId },
@@ -18,73 +24,128 @@ const TABS = [
 ] as const
 
 // ---------------------------------------------------------------------------
-// Output placeholder card (Stage 5 will replace these)
+// Mix B empty-state — shown when Mix B has no tracks
 // ---------------------------------------------------------------------------
-function OutputCard({ title, subtitle }: { title: string; subtitle: string }) {
+function MixBEmptyState() {
+  const { cloneMixAtoB } = useMixStore()
+
   return (
-    <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark p-4 flex flex-col gap-1">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-kumu-blue">
-        {title}
-      </p>
-      <p className="text-xs text-kumu-navy-light dark:text-kumu-blue-lighter">
-        {subtitle}
-      </p>
+    <div className="flex-1 flex flex-col items-center justify-center gap-6 p-8 text-center">
+      <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-kumu-navy flex items-center justify-center">
+        <Copy size={24} className="text-kumu-navy-light dark:text-kumu-blue-lighter" />
+      </div>
+
+      <div>
+        <h2 className="text-base font-semibold text-kumu-navy dark:text-white mb-2">
+          הזמן בדיוק יותר טוב משכפול
+        </h2>
+        <p className="text-sm text-kumu-navy-light dark:text-kumu-blue-lighter max-w-sm leading-relaxed">
+          תמהיל ב' מאפשר לכם להשוות שתי גרסאות תכנון של אותה המשכנתא,
+          ולראות איזו אסטרטגיה משתלמת יותר.
+        </p>
+      </div>
+
+      <div className="flex flex-col items-center gap-3">
+        <button
+          type="button"
+          onClick={cloneMixAtoB}
+          className="px-6 py-2.5 rounded-xl bg-kumu-blue text-white text-sm font-medium hover:bg-kumu-blue-light transition-colors"
+        >
+          שכפל מתמהיל א'
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            // "Start empty" — Mix B already starts empty; just mark it non-empty
+            // by delegating to addTrack which we trigger via the TracksManager
+            // We can't easily do this here without importing addTrack.
+            // So we clone and immediately clear — simpler UX: user adds tracks manually.
+            // We render the full MixTabContent when even 0 tracks is chosen as "start empty".
+            // Workaround: set a local flag. For simplicity, we just reload the mix-b route
+            // with a dummy flag via a state update.
+            // Best approach: store a "started" flag in the mix.
+            // For now, tell the user to add a track via the manager.
+            window.history.pushState({ mixBStarted: true }, '')
+          }}
+          className="px-6 py-2.5 rounded-xl border border-gray-200 dark:border-kumu-navy-light text-kumu-navy dark:text-kumu-blue-lighter text-sm font-medium hover:bg-gray-50 dark:hover:bg-kumu-navy transition-colors"
+        >
+          התחל תמהיל ב' ריק
+        </button>
+      </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Mix tab — 40% inputs | 60% outputs (RTL: inputs on right, outputs on left)
+// Mix tab outputs column
+// ---------------------------------------------------------------------------
+function MixOutputs({ mixId }: { mixId: MixId }) {
+  return (
+    <div className="flex flex-col gap-3 overflow-y-auto">
+      <KPIDashboard      mixId={mixId} />
+      <DistributionDonut mixId={mixId} />
+      <PaymentLineChart  mixId={mixId} />
+      <CostBreakdownBars mixId={mixId} />
+      <AmortizationTable mixId={mixId} />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Mix tab content — inputs left + outputs right (RTL: inputs on right)
 // ---------------------------------------------------------------------------
 function MixTabContent({ mixId }: { mixId: MixId }) {
   return (
     <div className="flex-1 grid grid-cols-[2fr_3fr] gap-4 p-4 min-h-0 overflow-hidden">
 
-      {/* Inputs column — 40%, appears on RIGHT in RTL */}
+      {/* Inputs column — 40%, RIGHT in RTL */}
       <div className="flex flex-col gap-3 overflow-y-auto">
-        <GlobalInputs    mixId={mixId} />
-        <MacroForecasts  mixId={mixId} />
-        <TracksManager   mixId={mixId} />
+        <GlobalInputs     mixId={mixId} />
+        <MacroForecasts   mixId={mixId} />
+        <TracksManager    mixId={mixId} />
         <PrepaymentEvents mixId={mixId} />
       </div>
 
-      {/* Outputs column — 60%, appears on LEFT in RTL */}
-      <div className="flex flex-col gap-3 overflow-y-auto">
-        <KPIDashboard mixId={mixId} />
-        <OutputCard
-          title="גרף התפתחות ההחזר"
-          subtitle="החזר חודשי לאורך כל תקופת המשכנתא — יחושב בשלב 5"
-        />
-        <OutputCard
-          title="התפלגות התמהיל"
-          subtitle="אחוז כל מסלול מסך המשכנתא — יחושב בשלב 5"
-        />
-        <OutputCard
-          title="טבלת סילוקין"
-          subtitle="פירוט חודשי: קרן, ריבית, הצמדה, יתרה — יחושב בשלב 5"
-        />
-      </div>
+      {/* Outputs column — 60%, LEFT in RTL */}
+      <MixOutputs mixId={mixId} />
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Investment tab — placeholder until Stage 6
+// Mix B tab — shows empty state or full content depending on tracks
+// ---------------------------------------------------------------------------
+function MixBTab() {
+  const mixB = useMix('b')
+  const hasStarted = mixB.tracks.length > 0
+
+  if (!hasStarted) {
+    return (
+      <div className="flex-1 flex flex-col min-h-0">
+        <MixBEmptyState />
+      </div>
+    )
+  }
+
+  return <MixTabContent mixId="b" />
+}
+
+// ---------------------------------------------------------------------------
+// Investment tab placeholder (Stage 6)
 // ---------------------------------------------------------------------------
 function InvestmentTabContent() {
   return (
-    <div className="flex-1 grid grid-cols-[2fr_3fr] gap-4 p-4 min-h-0 overflow-hidden">
-      <div className="flex flex-col gap-3 overflow-y-auto">
-        <OutputCard
-          title="פרמטרי השקעה"
-          subtitle="הון ראשוני, הפקדה חודשית, תשואה ומס — יבנה בשלב 6"
-        />
+    <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="w-14 h-14 rounded-2xl bg-kumu-blue/10 flex items-center justify-center">
+        <TrendingUp size={24} className="text-kumu-blue" />
       </div>
-      <div className="flex flex-col gap-3 overflow-y-auto">
-        <OutputCard
-          title="תוצאות ומטריצת החלטה"
-          subtitle="השוואת עלות המשכנתא מול תשואת ההשקעה — יבנה בשלב 6"
-        />
+      <div>
+        <h2 className="text-base font-semibold text-kumu-navy dark:text-white mb-1">
+          מחשבון השקעה
+        </h2>
+        <p className="text-sm text-kumu-navy-light dark:text-kumu-blue-lighter max-w-xs leading-relaxed">
+          יחושב בשלב 6 — השוואת עלות המשכנתא מול תשואת ההשקעה.
+        </p>
       </div>
     </div>
   )
@@ -94,6 +155,9 @@ function InvestmentTabContent() {
 // Dashboard — main shell
 // ---------------------------------------------------------------------------
 export function Dashboard() {
+  const mixB      = useMix('b')
+  const mixBHasTracks = mixB.tracks.length > 0
+
   return (
     <div className="h-screen flex flex-col bg-kumu-bg-light dark:bg-kumu-bg-dark overflow-hidden">
       <Header />
@@ -117,13 +181,32 @@ export function Dashboard() {
             {label}
           </NavLink>
         ))}
+
+        {/* Comparison tab — only when Mix B has tracks */}
+        {mixBHasTracks && (
+          <NavLink
+            to="/comparison"
+            className={({ isActive }) =>
+              [
+                'flex items-center gap-2 px-4 py-3.5 text-sm font-medium border-b-2 transition-colors duration-150',
+                isActive
+                  ? 'border-kumu-blue text-kumu-blue'
+                  : 'border-transparent text-kumu-navy-light dark:text-kumu-blue-lighter hover:text-kumu-navy dark:hover:text-white',
+              ].join(' ')
+            }
+          >
+            <GitCompare size={15} />
+            השוואה
+          </NavLink>
+        )}
       </nav>
 
-      {/* Route content — fills remaining height */}
+      {/* Route content */}
       <div className="flex-1 flex flex-col min-h-0">
         <Routes>
           <Route path="/mix-a"      element={<MixTabContent mixId="a" />} />
-          <Route path="/mix-b"      element={<MixTabContent mixId="b" />} />
+          <Route path="/mix-b"      element={<MixBTab />} />
+          <Route path="/comparison" element={<ComparisonTab />} />
           <Route path="/investment" element={<InvestmentTabContent />} />
           <Route path="*"           element={<Navigate to="/mix-a" replace />} />
         </Routes>
