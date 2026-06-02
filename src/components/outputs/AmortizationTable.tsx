@@ -12,8 +12,8 @@
  *  • Sticky totals row at bottom
  */
 
-import { useMemo, useState, useRef } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { useMemo, useState, useRef, useCallback } from 'react'
+import { ChevronDown, ChevronUp, Download, Printer } from 'lucide-react'
 import { useMix } from '@/store/useMixStore'
 import { calculateMix } from '@/engine/calculateMix'
 import { formatCurrency, formatCurrencyWhole } from '@/utils/format'
@@ -151,10 +151,41 @@ function rowClass(row: TableRow): string {
 // ---------------------------------------------------------------------------
 // Public component
 // ---------------------------------------------------------------------------
+// Types / props
+// ---------------------------------------------------------------------------
 interface AmortizationTableProps {
   mixId: MixId
 }
 
+// ---------------------------------------------------------------------------
+// CSV export helper
+// ---------------------------------------------------------------------------
+function downloadCSV(rows: TableRow[], mixId: MixId) {
+  const headers = ['חודש', 'יתרת פתיחה', 'תשלום קרן', 'תשלום ריבית', 'הצמדה/שע"ח', 'סך תשלום', 'יתרת סגירה']
+  const lines = rows.map((r) => [
+    r.isYearRow ? `שנה ${r.month}` : String(r.month),
+    Math.round(r.openingBalance),
+    Math.round(r.principalPayment),
+    Math.round(r.interestPayment),
+    Math.round(r.inflationComponent),
+    Math.round(r.totalPayment),
+    Math.round(r.closingBalance),
+  ].join(','))
+
+  // BOM (uFEFF) ensures Excel opens Hebrew text correctly
+  const content = '﻿' + [headers.join(','), ...lines].join('\r\n')
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `kumu-amortization-mix-${mixId}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ---------------------------------------------------------------------------
+// Public component
+// ---------------------------------------------------------------------------
 export function AmortizationTable({ mixId }: AmortizationTableProps) {
   const [open,           setOpen]           = useState(false)
   const [viewMode,       setViewMode]       = useState<'monthly' | 'yearly'>('monthly')
@@ -193,13 +224,18 @@ export function AmortizationTable({ mixId }: AmortizationTableProps) {
   }), [displayRows])
 
   // Jump-to handler
-  function handleJump() {
+  const handleJump = useCallback(() => {
     const n = parseInt(jumpTo)
     if (isNaN(n)) return
     const key = viewMode === 'yearly' ? Math.ceil(n / 12) : n
     const el = rowRefs.current.get(key)
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }
+  }, [jumpTo, viewMode])
+
+  // CSV export — always exports the full monthly schedule
+  const handleExportCSV = useCallback(() => {
+    downloadCSV(monthlyRows, mixId)
+  }, [monthlyRows, mixId])
 
   const trackOptions = mix.tracks.map((t: LoanTrack) => ({
     id:    t.id,
@@ -210,22 +246,59 @@ export function AmortizationTable({ mixId }: AmortizationTableProps) {
 
   return (
     <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
+      {/* Hidden print header — shown only via print.css */}
+      <div className="print-header hidden">
+        <div className="print-header-logo">K</div>
+        <div className="print-header-title">
+          <span className="brand">KUMU</span>
+          <span className="subtitle">
+            סימולטור משכנתא — טבלת סילוקין {mixId === 'a' ? "תמהיל א'" : "תמהיל ב'"}
+          </span>
+        </div>
+      </div>
+
       {/* Accordion header */}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-kumu-navy transition-colors"
-      >
-        <span className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
-          טבלת סילוקין מפורטת
-        </span>
-        <span className="text-kumu-navy-light dark:text-kumu-blue-lighter">
-          {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-        </span>
-      </button>
+      <div className="flex items-center justify-between px-4 py-3 no-print">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-2 flex-1 text-right"
+        >
+          <span className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
+            טבלת סילוקין מפורטת
+          </span>
+          <span className="text-kumu-navy-light dark:text-kumu-blue-lighter">
+            {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          </span>
+        </button>
+
+        {/* Export / Print buttons — only when open and has data */}
+        {open && hasData && (
+          <div className="flex items-center gap-1.5 mr-2">
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              title="יצוא ל-CSV (תואם Excel)"
+              className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-kumu-blue/10 text-kumu-blue hover:bg-kumu-blue/20 transition-colors"
+            >
+              <Download size={12} />
+              CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              title="הדפסה / שמירה כ-PDF"
+              className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg border border-gray-200 dark:border-kumu-navy-light text-kumu-navy-light dark:text-kumu-blue-lighter hover:bg-gray-50 dark:hover:bg-kumu-navy transition-colors"
+            >
+              <Printer size={12} />
+              PDF
+            </button>
+          </div>
+        )}
+      </div>
 
       {open && (
-        <div className="border-t border-gray-100 dark:border-kumu-navy-light">
+        <div className="amortization-body border-t border-gray-100 dark:border-kumu-navy-light">
           {!hasData ? (
             <div className="flex items-center justify-center py-8">
               <p className="text-sm text-kumu-navy-light dark:text-kumu-blue-lighter">

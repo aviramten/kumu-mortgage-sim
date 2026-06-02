@@ -1,6 +1,8 @@
-import { NavLink, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { NavLink, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { BarChart3, TrendingUp, LayoutList, Copy, GitCompare } from 'lucide-react'
 import { Header } from './Header'
+import { Footer } from './Footer'
 import { ComparisonTab } from './ComparisonTab'
 import { GlobalInputs } from '@/components/inputs/GlobalInputs'
 import { MacroForecasts } from '@/components/inputs/MacroForecasts'
@@ -11,11 +13,12 @@ import { DistributionDonut } from '@/components/outputs/charts/DistributionDonut
 import { PaymentLineChart } from '@/components/outputs/charts/PaymentLineChart'
 import { CostBreakdownBars } from '@/components/outputs/charts/CostBreakdownBars'
 import { AmortizationTable } from '@/components/outputs/AmortizationTable'
+import { InvestmentTab } from '@/components/investment/InvestmentTab'
 import { useMix, useMixStore } from '@/store/useMixStore'
 import type { MixId } from '@/types/mix'
 
 // ---------------------------------------------------------------------------
-// Tab configuration  (comparison tab added dynamically in the nav)
+// Tab configuration
 // ---------------------------------------------------------------------------
 const TABS = [
   { to: '/mix-a',      label: "תמהיל א'",     icon: LayoutList, mixId: 'a' as MixId },
@@ -56,15 +59,7 @@ function MixBEmptyState() {
         <button
           type="button"
           onClick={() => {
-            // "Start empty" — Mix B already starts empty; just mark it non-empty
-            // by delegating to addTrack which we trigger via the TracksManager
-            // We can't easily do this here without importing addTrack.
-            // So we clone and immediately clear — simpler UX: user adds tracks manually.
-            // We render the full MixTabContent when even 0 tracks is chosen as "start empty".
-            // Workaround: set a local flag. For simplicity, we just reload the mix-b route
-            // with a dummy flag via a state update.
-            // Best approach: store a "started" flag in the mix.
-            // For now, tell the user to add a track via the manager.
+            // Workaround: push state so the component re-renders as "started"
             window.history.pushState({ mixBStarted: true }, '')
           }}
           className="px-6 py-2.5 rounded-xl border border-gray-200 dark:border-kumu-navy-light text-kumu-navy dark:text-kumu-blue-lighter text-sm font-medium hover:bg-gray-50 dark:hover:bg-kumu-navy transition-colors"
@@ -131,39 +126,31 @@ function MixBTab() {
 }
 
 // ---------------------------------------------------------------------------
-// Investment tab placeholder (Stage 6)
-// ---------------------------------------------------------------------------
-function InvestmentTabContent() {
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-kumu-blue/10 flex items-center justify-center">
-        <TrendingUp size={24} className="text-kumu-blue" />
-      </div>
-      <div>
-        <h2 className="text-base font-semibold text-kumu-navy dark:text-white mb-1">
-          מחשבון השקעה
-        </h2>
-        <p className="text-sm text-kumu-navy-light dark:text-kumu-blue-lighter max-w-xs leading-relaxed">
-          יחושב בשלב 6 — השוואת עלות המשכנתא מול תשואת ההשקעה.
-        </p>
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Dashboard — main shell
+// Dashboard — main shell with keyboard shortcuts + footer
 // ---------------------------------------------------------------------------
 export function Dashboard() {
-  const mixB      = useMix('b')
+  const mixB          = useMix('b')
   const mixBHasTracks = mixB.tracks.length > 0
+  const navigate      = useNavigate()
+
+  // Keyboard shortcuts: Ctrl/Cmd + 1/2/3 → switch tabs
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!e.metaKey && !e.ctrlKey) return
+      if (e.key === '1') { e.preventDefault(); navigate('/mix-a') }
+      else if (e.key === '2') { e.preventDefault(); navigate('/mix-b') }
+      else if (e.key === '3') { e.preventDefault(); navigate('/investment') }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [navigate])
 
   return (
     <div className="h-screen flex flex-col bg-kumu-bg-light dark:bg-kumu-bg-dark overflow-hidden">
       <Header />
 
       {/* Tab navigation */}
-      <nav className="flex-shrink-0 flex items-stretch bg-white dark:bg-kumu-surface-dark border-b border-gray-100 dark:border-kumu-navy-light px-6">
+      <nav className="tabs-nav flex-shrink-0 flex items-stretch bg-white dark:bg-kumu-surface-dark border-b border-gray-100 dark:border-kumu-navy-light px-6 no-print">
         {TABS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
@@ -207,10 +194,12 @@ export function Dashboard() {
           <Route path="/mix-a"      element={<MixTabContent mixId="a" />} />
           <Route path="/mix-b"      element={<MixBTab />} />
           <Route path="/comparison" element={<ComparisonTab />} />
-          <Route path="/investment" element={<InvestmentTabContent />} />
+          <Route path="/investment" element={<InvestmentTab />} />
           <Route path="*"           element={<Navigate to="/mix-a" replace />} />
         </Routes>
       </div>
+
+      <Footer />
     </div>
   )
 }

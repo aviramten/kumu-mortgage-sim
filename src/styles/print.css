@@ -1,0 +1,181 @@
+/**
+ * KUMU Mortgage Simulator — Print stylesheet
+ * Produces a clean A4 financial report when the user prints or saves as PDF.
+ *
+ * Usage:
+ *  - Add class="no-print"   to hide elements during printing
+ *  - Add class="print-only" to show elements only during printing
+ *  - Add class="print-header" for the branded report header
+ */
+
+@media print {
+  /* ── Page setup ──────────────────────────────────────────── */
+  @page {
+    size: A4 portrait;
+    margin: 15mm 15mm 18mm 15mm;
+  }
+
+  /* ── Force colour rendering ───────────────────────────────── */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* ── Dark mode → force light in print ────────────────────── */
+  html,
+  body {
+    background: #ffffff !important;
+    color: #1a2456 !important;
+    font-family: 'Heebo', 'Arial Hebrew', Arial, sans-serif !important;
+    font-size: 11pt;
+  }
+
+  /* ── Hide non-essential chrome ───────────────────────────── */
+  header,
+  nav,
+  footer,
+  .no-print,
+  button,
+  input,
+  select,
+  [role="tablist"],
+  .tabs-nav {
+    display: none !important;
+  }
+
+  /* ── Show print-only elements ────────────────────────────── */
+  .print-only {
+    display: block !important;
+  }
+
+  /* ── Branded report header ──────────────────────────────── */
+  .print-header {
+    display: flex !important;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid #3b5bdb;
+    page-break-after: avoid;
+  }
+
+  .print-header-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #3b5bdb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .print-header-title {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+  }
+
+  .print-header-title .brand {
+    font-size: 14pt;
+    font-weight: 700;
+    color: #1a2456;
+    letter-spacing: 0.05em;
+  }
+
+  .print-header-title .subtitle {
+    font-size: 9pt;
+    color: #6b7280;
+  }
+
+  /* ── Force accordion open ────────────────────────────────── */
+  .amortization-body {
+    display: block !important;
+  }
+
+  /* ── Surface / card resets ───────────────────────────────── */
+  .rounded-xl,
+  .rounded-lg {
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  /* ── Table styles ────────────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+
+  thead tr {
+    background: #f3f4f6 !important;
+  }
+
+  th {
+    color: #6b7280 !important;
+    font-weight: 600;
+    border: 1px solid #d1d5db !important;
+    padding: 5px 8px !important;
+  }
+
+  td {
+    border: 1px solid #e5e7eb !important;
+    padding: 4px 8px !important;
+    color: #1a2456 !important;
+    background: transparent !important;
+  }
+
+  tfoot tr {
+    background: #f9fafb !important;
+    font-weight: 700;
+  }
+
+  /* ── Highlight rows survive print ───────────────────────── */
+  tr.bg-amber-50,
+  tr[class*="amber"] {
+    background: #fffbeb !important;
+  }
+
+  tr.bg-blue-50,
+  tr[class*="blue-50"] {
+    background: #eff6ff !important;
+  }
+
+  /* ── Page breaks ─────────────────────────────────────────── */
+  .page-break-before {
+    page-break-before: always;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid;
+  }
+
+  /* ── Charts: allow SVG to render ────────────────────────── */
+  svg {
+    overflow: visible;
+  }
+
+  /* ── Max width for readability ───────────────────────────── */
+  .flex-1 {
+    flex: none !important;
+    width: 100% !important;
+  }
+
+  .grid {
+    display: block !important;
+  }
+
+  .overflow-auto,
+  .overflow-y-auto,
+  .max-h-96 {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+}
