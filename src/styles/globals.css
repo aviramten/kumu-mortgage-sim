@@ -56,3 +56,19 @@ body {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* Scrollable columns — thin always-visible scrollbar */
+.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #A5B8FF transparent;
+}
+.overflow-y-auto::-webkit-scrollbar {
+  width: 5px;
+}
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background-color: #A5B8FF;
+  border-radius: 99px;
+}
