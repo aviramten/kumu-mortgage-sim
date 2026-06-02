@@ -2,12 +2,12 @@ import { Plus } from 'lucide-react'
 import { useMix, useMixStore } from '@/store/useMixStore'
 import { formatNumber } from '@/utils/format'
 import { BALANCE_OK_THRESHOLD, BALANCE_WARN_THRESHOLD } from '@/utils/constants'
-import { TrackCard } from './TrackCard'
+import { TrackRow } from './TrackRow'
 import type { LoanTrack } from '@/types/track'
 import type { MixId } from '@/types/mix'
 
 // ---------------------------------------------------------------------------
-// BalanceIndicator — shows real-time allocation vs mortgage amount
+// BalanceIndicator — real-time allocation vs mortgage amount
 // ---------------------------------------------------------------------------
 interface BalanceIndicatorProps {
   mortgageAmount: number
@@ -19,7 +19,6 @@ function BalanceIndicator({ mortgageAmount, tracks }: BalanceIndicatorProps) {
   const gap       = mortgageAmount - allocated
   const absGap    = Math.abs(gap)
 
-  // Color tiers: green ≤ 100₪ | yellow ≤ 10,000₪ | orange/red > 10,000₪
   const tier =
     absGap <= BALANCE_OK_THRESHOLD   ? 'ok'   :
     absGap <= BALANCE_WARN_THRESHOLD ? 'warn' : 'error'
@@ -32,7 +31,7 @@ function BalanceIndicator({ mortgageAmount, tracks }: BalanceIndicatorProps) {
 
   const label =
     gap === 0
-      ? 'כל סכום המשכנתא מוקצה'
+      ? 'כל סכום המשכנתא מוקצה ✓'
       : gap > 0
         ? `נותר להקצאה: ₪${formatNumber(gap)}`
         : `חריגה של ₪${formatNumber(absGap)} מסכום המשכנתא`
@@ -61,55 +60,105 @@ export function TracksManager({ mixId }: TracksManagerProps) {
   return (
     <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
 
-      {/* Section header */}
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-kumu-navy-light">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue">
           מסלולי המשכנתא
         </h2>
-        <span className="text-[11px] text-kumu-navy-light dark:text-kumu-blue-lighter">
-          {tracks.length} {tracks.length === 1 ? 'מסלול' : 'מסלולים'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-kumu-navy-light dark:text-kumu-blue-lighter">
+            {tracks.length} {tracks.length === 1 ? 'מסלול' : 'מסלולים'}
+          </span>
+          <button
+            type="button"
+            onClick={() => addTrack(mixId)}
+            className={[
+              'flex items-center gap-1 h-7 px-2.5 rounded-lg',
+              'bg-kumu-blue text-white text-xs font-semibold',
+              'hover:bg-kumu-blue-light active:scale-95 transition-all duration-100',
+            ].join(' ')}
+          >
+            <Plus size={12} />
+            הוסף מסלול
+          </button>
+        </div>
       </div>
 
-      <div className="flex flex-col gap-3 p-3">
+      {/* ── Body ────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-2 p-3">
 
-        {/* Balance indicator — always visible */}
+        {/* Balance indicator */}
         <BalanceIndicator
           mortgageAmount={globalInputs.mortgageAmount}
           tracks={tracks}
         />
 
-        {/* Track list */}
-        {tracks.length === 0 ? (
-          <p className="text-xs text-center text-kumu-navy-light dark:text-kumu-blue-lighter py-4">
+        {/* Empty state */}
+        {tracks.length === 0 && (
+          <p className="text-xs text-center text-kumu-navy-light dark:text-kumu-blue-lighter py-6">
             טרם נוספו מסלולים. לחץ על "הוסף מסלול" כדי להתחיל.
           </p>
-        ) : (
-          tracks.map((track, idx) => (
-            <TrackCard
-              key={track.id}
-              track={track}
-              mixId={mixId}
-              index={idx + 1}
-            />
-          ))
         )}
 
-        {/* Add track button */}
-        <button
-          type="button"
-          onClick={() => addTrack(mixId)}
-          className={[
-            'flex items-center justify-center gap-2 w-full h-9 rounded-xl border-2 border-dashed',
-            'border-kumu-blue/30 dark:border-kumu-blue-lighter/30',
-            'text-xs font-medium text-kumu-blue dark:text-kumu-blue-lighter',
-            'hover:border-kumu-blue hover:bg-kumu-blue/5 dark:hover:border-kumu-blue-lighter dark:hover:bg-kumu-blue/10',
-            'transition-all duration-150',
-          ].join(' ')}
-        >
-          <Plus size={14} />
-          הוסף מסלול
-        </button>
+        {/* Tracks table */}
+        {tracks.length > 0 && (
+          <div className="overflow-x-auto rounded-lg border border-gray-100 dark:border-kumu-navy-light/40">
+            <table
+              className="w-full min-w-[520px] border-collapse text-right"
+              dir="rtl"
+            >
+              {/* Column header */}
+              <thead>
+                <tr className="bg-gray-50 dark:bg-kumu-navy-dark/50">
+                  {/* # */}
+                  <th className="px-1 py-1.5 w-6" />
+                  {/* Type */}
+                  <th className="px-1 py-1.5 w-[88px] text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter text-right">
+                    סוג
+                  </th>
+                  {/* Schedule */}
+                  <th className="px-1 py-1.5 w-[76px] text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter text-right">
+                    שיטה
+                  </th>
+                  {/* Amount */}
+                  <th className="px-1 py-1.5 w-[84px] text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter text-center">
+                    סכום ₪
+                  </th>
+                  {/* Months */}
+                  <th className="px-1 py-1.5 w-[52px] text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter text-center">
+                    ח׳
+                  </th>
+                  {/* Rate */}
+                  <th className="px-1 py-1.5 w-[52px] text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter text-center">
+                    ריבית %
+                  </th>
+                  {/* Grace type */}
+                  <th className="px-1 py-1.5 w-[76px] text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter text-right">
+                    גרייס
+                  </th>
+                  {/* Grace months */}
+                  <th className="px-1 py-1.5 w-[44px] text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter text-center">
+                    ח"ג
+                  </th>
+                  {/* Actions */}
+                  <th className="px-1 py-1.5 w-10" />
+                </tr>
+              </thead>
+
+              {/* Track rows */}
+              <tbody>
+                {tracks.map((track, idx) => (
+                  <TrackRow
+                    key={track.id}
+                    track={track}
+                    mixId={mixId}
+                    index={idx + 1}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
       </div>
     </div>
