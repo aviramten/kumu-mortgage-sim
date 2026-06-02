@@ -96,9 +96,9 @@ function MixTabContent({ mixId }: { mixId: MixId }) {
       {/* Inputs column — 40%, RIGHT in RTL */}
       <div className="flex flex-col gap-3 overflow-y-auto">
         <GlobalInputs     mixId={mixId} />
-        <MacroForecasts   mixId={mixId} />
         <TracksManager    mixId={mixId} />
         <PrepaymentEvents mixId={mixId} />
+        <MacroForecasts   mixId={mixId} />
       </div>
 
       {/* Outputs column — 60%, LEFT in RTL */}

@@ -62,7 +62,7 @@ function NumberInput({ value, onChange, placeholder, hasError = false }: NumberI
         onChange={handleChange}
         placeholder={placeholder}
         className={[
-          'w-full h-10 rounded-xl bg-transparent pl-7 pr-3 text-sm',
+          'w-full h-9 rounded-xl bg-transparent pl-7 pr-3 text-sm',
           'text-kumu-navy dark:text-white outline-none',
           hasError ? 'placeholder:text-kumu-error/50' : 'placeholder:text-gray-300',
         ].join(' ')}
@@ -143,8 +143,8 @@ export function GlobalInputs({ mixId }: GlobalInputsProps) {
 
   // -------- render --------
   return (
-    <div className="flex flex-col gap-4 p-4 bg-white dark:bg-kumu-surface-dark rounded-xl border border-gray-100 dark:border-kumu-navy-light">
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue">
+    <div className="flex flex-col gap-3 p-3 bg-white dark:bg-kumu-surface-dark rounded-xl border border-gray-100 dark:border-kumu-navy-light">
+      <h2 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue px-1">
         נתוני הנכס
       </h2>
 
@@ -175,7 +175,7 @@ export function GlobalInputs({ mixId }: GlobalInputsProps) {
           value={purchaseStatus}
           onChange={(e) => setPurchaseStatus(e.target.value as PurchaseStatus)}
           className={[
-            'w-full h-10 rounded-xl border border-gray-200 dark:border-kumu-navy-light',
+            'w-full h-9 rounded-xl border border-gray-200 dark:border-kumu-navy-light',
             'bg-white dark:bg-kumu-surface-dark px-3 text-sm',
             'text-kumu-navy dark:text-white outline-none',
             'focus:border-kumu-blue focus:ring-2 focus:ring-kumu-blue/20 transition-all',
