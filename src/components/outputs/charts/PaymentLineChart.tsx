@@ -116,7 +116,7 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
       .map(([month, payment]) => ({ month, payment }))
   }, [result.trackResults])
 
-  const { rateChanges, prepaymentMonths } = useMemo(
+  const { prepaymentMonths } = useMemo(
     () => getNotableMonths(mix.tracks, mix.prepayments),
     [mix.tracks, mix.prepayments],
   )

@@ -106,7 +106,7 @@ function SummaryTable({ summaries }: { summaries: MixSummary[] }) {
         </tr>
       </thead>
       <tbody>
-        {TABLE_ROWS.map((row, i) => {
+        {TABLE_ROWS.map((row) => {
           const isSeparator = row.key === 'total'
           return (
             <tr
