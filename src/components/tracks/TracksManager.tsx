@@ -54,8 +54,8 @@ const HEADERS: { label: string; title?: string; cls?: string }[] = [
   { label: '',                cls: 'w-7' },
   { label: 'מסלול',           cls: 'w-[84px]' },
   { label: 'לוח סילוקין',     cls: 'w-[90px]' },
-  { label: '%',               title: 'אחוז מהמשכנתא',           cls: 'w-[46px] text-center' },
-  { label: 'סכום ₪ / %',     title: 'הזן סכום בשקלים — לחץ % לעבור לאחוזים', cls: 'w-[110px] text-center' },
+  { label: '%',               title: 'הזן אחוז — מחשב ₪ אוטומטית',  cls: 'w-[58px] text-center' },
+  { label: 'סכום ₪',         title: 'סכום בשקלים',                cls: 'w-[90px] text-center'  },
   { label: 'חודשים',          title: 'תקופה בחודשים',            cls: 'w-[52px] text-center' },
   { label: 'ריבית %',         cls: 'w-[56px] text-center' },
   { label: 'תדירות עדכון',    title: 'תדירות עדכון ריבית',       cls: 'w-[78px] text-center' },
@@ -124,7 +124,7 @@ export function TracksManager({ mixId }: TracksManagerProps) {
         <div className="overflow-x-auto px-3 pb-3 pt-1">
           <table
             className="w-full border-collapse text-right"
-            style={{ minWidth: 930 }}
+            style={{ minWidth: 910 }}
             dir="rtl"
           >
             {/* Column headers */}
