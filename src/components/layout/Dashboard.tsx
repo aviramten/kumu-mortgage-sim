@@ -30,10 +30,10 @@ const TABS = [
 // Mix B empty-state — shown when Mix B has no tracks
 // ---------------------------------------------------------------------------
 function MixBEmptyState() {
-  const { cloneMixAtoB } = useMixStore()
+  const { cloneMixAtoB, addTrack } = useMixStore()
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-6 p-8 text-center">
+    <div className="flex flex-col items-center justify-center gap-6 py-16 px-8 text-center">
       <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-kumu-navy flex items-center justify-center">
         <Copy size={24} className="text-kumu-navy-light dark:text-kumu-blue-lighter" />
       </div>
@@ -43,7 +43,7 @@ function MixBEmptyState() {
           הזמן בדיוק יותר טוב משכפול
         </h2>
         <p className="text-sm text-kumu-navy-light dark:text-kumu-blue-lighter max-w-sm leading-relaxed">
-          תמהיל ב' מאפשר לכם להשוות שתי גרסאות תכנון של אותה המשכנתא,
+          תמהיל ב' מאפשר להשוות שתי גרסאות תכנון של אותה המשכנתא
           ולראות איזו אסטרטגיה משתלמת יותר.
         </p>
       </div>
@@ -58,10 +58,7 @@ function MixBEmptyState() {
         </button>
         <button
           type="button"
-          onClick={() => {
-            // Workaround: push state so the component re-renders as "started"
-            window.history.pushState({ mixBStarted: true }, '')
-          }}
+          onClick={() => addTrack('b')}
           className="px-6 py-2.5 rounded-xl border border-gray-200 dark:border-kumu-navy-light text-kumu-navy dark:text-kumu-blue-lighter text-sm font-medium hover:bg-gray-50 dark:hover:bg-kumu-navy transition-colors"
         >
           התחל תמהיל ב' ריק
@@ -140,11 +137,11 @@ export function Dashboard() {
   return (
     <div className="min-h-screen flex flex-col bg-kumu-bg-light dark:bg-kumu-bg-dark">
       {/* ── Sticky top bar: header + nav ─────────────────────────────────── */}
-      <div className="sticky top-0 z-50 flex flex-col">
-      <Header />
+      <div className="sticky top-0 z-50 flex flex-col shadow-sm">
+        <Header />
 
-      {/* Tab navigation */}
-      <nav className="tabs-nav flex items-stretch bg-white dark:bg-kumu-surface-dark border-b border-gray-100 dark:border-kumu-navy-light px-6 no-print shadow-sm">
+        {/* Tab navigation */}
+        <nav className="tabs-nav flex items-stretch bg-white dark:bg-kumu-surface-dark border-b border-gray-100 dark:border-kumu-navy-light px-6 no-print">
         {TABS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
@@ -180,7 +177,7 @@ export function Dashboard() {
             השוואה
           </NavLink>
         )}
-      </nav>
+        </nav>
       </div>{/* end sticky top bar */}
 
       {/* ── Page content — scrolls naturally ─────────────────────────────── */}
