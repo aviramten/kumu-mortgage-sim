@@ -45,23 +45,20 @@ function BalanceIndicator({
 /* ── Column header definitions ─────────────────────────────────────────────── */
 
 const HEADERS: { label: string; title?: string; cls?: string }[] = [
-  { label: '',         cls: 'w-7'      },  // badge
-  { label: 'מסלול',   cls: 'w-[84px]' },
-  { label: 'לוח',     title: 'לוח סילוקין',          cls: 'w-[64px]' },
-  { label: '%',       title: 'אחוז מהמשכנתא',        cls: 'w-[42px] text-center' },
-  { label: 'סכום ₪', cls: 'w-[88px] text-center' },
-  { label: "ח'",      title: 'תקופה (חודשים)',        cls: 'w-[44px] text-center' },
-  { label: 'עוגן',   title: 'ריבית עוגן (בנצ\'מרק)', cls: 'w-[50px] text-center' },
-  { label: 'תוספת',  title: 'מרווח הבנק מעל העוגן',  cls: 'w-[52px] text-center' },
-  { label: 'ריבית %', cls: 'w-[52px] text-center' },
-  { label: 'תדירות', title: 'תדירות עדכון הריבית',    cls: 'w-[62px] text-center' },
-  { label: 'גרייס ח\'', title: 'גרייס חלקי (חודשים)', cls: 'w-[44px] text-center' },
-  { label: 'גרייס מ\'', title: 'גרייס מלא (חודשים)',  cls: 'w-[44px] text-center' },
-  { label: 'בלון',    title: 'מועד לשחרור (חודשים)', cls: 'w-[44px] text-center' },
-  { label: 'שוט"פ',  title: 'החזר חודשי (חודש 1)',  cls: 'w-[76px] text-center' },
-  { label: '₪/שקל', title: 'סה"כ עלות לכל ₪ מוקצה', cls: 'w-[52px] text-center' },
-  { label: '',         cls: 'w-7'      },  // פירעון
-  { label: '',         cls: 'w-7'      },  // delete
+  { label: '',                cls: 'w-7' },
+  { label: 'מסלול',           cls: 'w-[84px]' },
+  { label: 'לוח סילוקין',     cls: 'w-[90px]' },
+  { label: '%',               title: 'אחוז מהמשכנתא',           cls: 'w-[46px] text-center' },
+  { label: 'סכום ₪',         cls: 'w-[88px] text-center' },
+  { label: 'חודשים',          title: 'תקופה בחודשים',            cls: 'w-[52px] text-center' },
+  { label: 'ריבית %',         cls: 'w-[56px] text-center' },
+  { label: 'תדירות עדכון',    title: 'תדירות עדכון ריבית',       cls: 'w-[78px] text-center' },
+  { label: 'גרייס חלקי',     title: 'גרייס חלקי — מספר חודשים', cls: 'w-[60px] text-center' },
+  { label: 'גרייס מלא',      title: 'גרייס מלא — מספר חודשים',  cls: 'w-[56px] text-center' },
+  { label: 'תשלום חודשי',    title: 'החזר חודשי שוטף (חודש 1)', cls: 'w-[86px] text-center' },
+  { label: 'עלות לשקל',      title: 'סה"כ עלות לכל ₪ מוקצה',    cls: 'w-[58px] text-center' },
+  { label: '',                cls: 'w-7' },  // פירעון
+  { label: '',                cls: 'w-7' },  // מחיקה
 ]
 
 /* ── TracksManager ─────────────────────────────────────────────────────────── */

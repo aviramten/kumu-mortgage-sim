@@ -9,11 +9,24 @@ import {
 } from 'recharts'
 import { useThemeStore } from '@/store/useThemeStore'
 import { useMix } from '@/store/useMixStore'
-import { KUMU_CHART_COLORS } from '@/utils/chartTheme'
 import { TRACK_TYPE_LABELS } from '@/utils/constants'
 import { formatCurrencyWhole } from '@/utils/format'
 import type { MixId } from '@/types/mix'
 import type { LoanTrack } from '@/types/track'
+
+// ---------------------------------------------------------------------------
+// Vibrant, highly-distinct per-slice color palette (index-based)
+// ---------------------------------------------------------------------------
+const SLICE_COLORS = [
+  '#3B5BDB', // kumu-blue
+  '#E87A5D', // coral
+  '#5BB572', // green
+  '#A879E0', // purple
+  '#F59E0B', // amber
+  '#14B8A6', // teal
+  '#F43F5E', // rose
+  '#FB923C', // orange
+]
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -23,16 +36,34 @@ interface SliceItem {
   value: number
   type:  LoanTrack['type']
   pct:   number
+  color: string
 }
 
 function buildSlices(tracks: LoanTrack[]): { slices: SliceItem[]; total: number } {
   const total = tracks.reduce((s, t) => s + t.amount, 0)
-  const slices = tracks.map((t) => ({
-    name:  TRACK_TYPE_LABELS[t.type] ?? t.type,
-    value: t.amount,
-    type:  t.type,
-    pct:   total > 0 ? Math.round((t.amount / total) * 100) : 0,
-  }))
+
+  // Count occurrences per display label for deduplication
+  const typeCounts: Record<string, number> = {}
+  for (const t of tracks) {
+    const lbl = TRACK_TYPE_LABELS[t.type] ?? t.type
+    typeCounts[lbl] = (typeCounts[lbl] ?? 0) + 1
+  }
+  const typeIdx: Record<string, number> = {}
+
+  const slices = tracks.map((t, i) => {
+    const baseLabel = TRACK_TYPE_LABELS[t.type] ?? t.type
+    typeIdx[baseLabel] = (typeIdx[baseLabel] ?? 0) + 1
+    const name = typeCounts[baseLabel] > 1
+      ? `${baseLabel} (${typeIdx[baseLabel]})`
+      : baseLabel
+    return {
+      name,
+      value: t.amount,
+      type:  t.type,
+      pct:   total > 0 ? Math.round((t.amount / total) * 100) : 0,
+      color: SLICE_COLORS[i % SLICE_COLORS.length],
+    }
+  })
   return { slices, total }
 }
 
@@ -132,7 +163,7 @@ export function DistributionDonut({ mixId }: DistributionDonutProps) {
                   {slices.map((s, i) => (
                     <Cell
                       key={`cell-${i}`}
-                      fill={KUMU_CHART_COLORS[s.type]}
+                      fill={s.color}
                       stroke={isDark ? '#0F1633' : '#fff'}
                       strokeWidth={2}
                     />
@@ -144,7 +175,6 @@ export function DistributionDonut({ mixId }: DistributionDonutProps) {
                   align="right"
                   verticalAlign="middle"
                   content={<CustomLegend />}
-                  formatter={(value) => value}
                 />
               </PieChart>
             </ResponsiveContainer>

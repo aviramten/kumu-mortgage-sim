@@ -12,7 +12,7 @@ import { useMix } from '@/store/useMixStore'
 import { useThemeStore } from '@/store/useThemeStore'
 import { calculateMix } from '@/engine/calculateMix'
 import {
-  KUMU_CHART_COLORS, getChartTooltipStyle, getChartAxisStyle,
+  getChartTooltipStyle, getChartAxisStyle,
   CHART_GRID_COLOR_LIGHT, CHART_GRID_COLOR_DARK,
 } from '@/utils/chartTheme'
 import { formatCurrencyWhole } from '@/utils/format'
@@ -147,12 +147,17 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
             <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id={`lineGrad-${mixId}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor={KUMU_CHART_COLORS['prime']} stopOpacity={0.15} />
-                  <stop offset="95%" stopColor={KUMU_CHART_COLORS['prime']} stopOpacity={0.01} />
+                  <stop offset="0%"  stopColor="#3B5BDB" stopOpacity={0.08} />
+                  <stop offset="90%" stopColor="#3B5BDB" stopOpacity={0.00} />
                 </linearGradient>
               </defs>
 
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+              <CartesianGrid
+                strokeDasharray="4 4"
+                stroke={gridColor}
+                strokeOpacity={0.5}
+                vertical={false}
+              />
 
               <XAxis
                 dataKey="month"
@@ -182,37 +187,15 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
                 )}
               />
 
-              {/* Rate-change reference lines */}
-              {Array.from(rateChanges).map((m) => (
-                <ReferenceLine
-                  key={`rc-${m}`}
-                  x={m}
-                  stroke="#9CA3AF"
-                  strokeDasharray="3 3"
-                  strokeWidth={1}
-                  label={{
-                    value: 'תחנה',
-                    position: 'top',
-                    fontSize: 9,
-                    fill: '#9CA3AF',
-                  }}
-                />
-              ))}
-
-              {/* Prepayment reference lines */}
+              {/* Prepayment reference lines — subtle, no label */}
               {Array.from(prepaymentMonths).map((m) => (
                 <ReferenceLine
                   key={`pp-${m}`}
                   x={m}
                   stroke="#5BB572"
-                  strokeDasharray="4 2"
-                  strokeWidth={1.5}
-                  label={{
-                    value: 'פירעון',
-                    position: 'top',
-                    fontSize: 9,
-                    fill: '#5BB572',
-                  }}
+                  strokeDasharray="4 3"
+                  strokeWidth={1}
+                  strokeOpacity={0.6}
                 />
               ))}
 
@@ -229,10 +212,10 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
               <Line
                 type="monotone"
                 dataKey="payment"
-                stroke={KUMU_CHART_COLORS['prime']}
+                stroke="#3B5BDB"
                 strokeWidth={2.5}
                 dot={false}
-                activeDot={{ r: 4, strokeWidth: 0 }}
+                activeDot={{ r: 4, fill: '#3B5BDB', strokeWidth: 0 }}
               />
             </ComposedChart>
           </ResponsiveContainer>
