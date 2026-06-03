@@ -10,7 +10,7 @@ import {
 import { useThemeStore } from '@/store/useThemeStore'
 import { useMix } from '@/store/useMixStore'
 import { TRACK_TYPE_LABELS } from '@/utils/constants'
-import { formatCurrencyWhole } from '@/utils/format'
+import { formatCurrencyWhole, formatNumber } from '@/utils/format'
 import type { MixId } from '@/types/mix'
 import type { LoanTrack } from '@/types/track'
 
@@ -179,15 +179,18 @@ export function DistributionDonut({ mixId }: DistributionDonutProps) {
               </PieChart>
             </ResponsiveContainer>
 
-            {/* Center label — positioned over chart centre (40% of width) */}
+            {/* Center label — positioned exactly at the donut cx/cy (40% / 50%) */}
             <div
-              className="absolute top-1/2 -translate-y-1/2 text-center pointer-events-none"
-              style={{ left: '40%', transform: 'translate(-50%, -50%)' }}
+              className="absolute text-center pointer-events-none"
+              style={{ left: '40%', top: '50%', transform: 'translate(-50%, -50%)' }}
             >
-              <p className="text-base font-bold text-kumu-navy dark:text-white tabular-nums leading-tight">
-                {formatCurrencyWhole(total)}
+              <p
+                className="text-[15px] font-bold text-kumu-navy dark:text-white tabular-nums leading-tight"
+                dir="ltr"
+              >
+                ₪{formatNumber(Math.round(total))}
               </p>
-              <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter">
+              <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter mt-0.5">
                 סך הקרן
               </p>
             </div>

@@ -61,7 +61,7 @@ const HEADERS: { label: string; title?: string; cls?: string }[] = [
   { label: 'תדירות עדכון',    title: 'תדירות עדכון ריבית',       cls: 'w-[78px] text-center' },
   { label: 'גרייס חלקי',     title: 'גרייס חלקי — מספר חודשים', cls: 'w-[60px] text-center' },
   { label: 'גרייס מלא',      title: 'גרייס מלא — מספר חודשים',  cls: 'w-[56px] text-center' },
-  { label: 'תשלום חודשי',    title: 'החזר חודשי שוטף (חודש 1)', cls: 'w-[86px] text-center' },
+  { label: 'תשלום חודשי',    title: 'החזר לאחר גרייס (שורה קטנה = בגרייס)', cls: 'w-[86px] text-center' },
   { label: 'עלות לשקל',      title: 'סה"כ עלות לכל ₪ מוקצה',    cls: 'w-[58px] text-center' },
   { label: '',                cls: 'w-7' },  // פירעון
   { label: '',                cls: 'w-7' },  // מחיקה

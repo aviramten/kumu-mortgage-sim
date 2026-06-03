@@ -147,18 +147,11 @@ function GraceCell({ track, forGrace, upd }: {
   const isActive  = track.graceType === forGrace
   const activates = forGrace as GraceType
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = parseInt(e.target.value, 10)
-    if (!isNaN(v) && v > 0) {
-      upd({ graceType: activates, graceMonths: v })
-    } else {
-      upd({ graceType: 'none', graceMonths: 0 })
-    }
-  }
-
   const isBalloon = track.graceType === 'balloon-partial' || track.graceType === 'balloon-full'
   if (isBalloon) return <div className={NA}>—</div>
 
+  // Hard cap: never exceed track duration (−1) or 360
+  const maxGrace = Math.min(track.months - 1, MAX_LOAN_MONTHS)
   const graceErr = isActive && track.graceMonths > 0 && track.graceMonths >= track.months
 
   return (
@@ -167,9 +160,16 @@ function GraceCell({ track, forGrace, upd }: {
       value={isActive && track.graceMonths > 0 ? track.graceMonths : ''}
       placeholder="חודשים"
       min={1}
-      max={track.months - 1}
-      onChange={handleChange}
-      title={`גרייס — תקופה בחודשים (מקסימום ${track.months - 1})`}
+      max={maxGrace}
+      onChange={e => {
+        const v = parseInt(e.target.value, 10)
+        if (!isNaN(v) && v > 0) {
+          upd({ graceType: activates, graceMonths: Math.min(v, maxGrace) })
+        } else {
+          upd({ graceType: 'none', graceMonths: 0 })
+        }
+      }}
+      title={`גרייס — תקופה בחודשים (מקסימום ${maxGrace})`}
       className={[
         I,
         !isActive ? 'placeholder:text-gray-300 dark:placeholder:text-kumu-navy-light/40' : '',
@@ -232,7 +232,19 @@ export function TrackRow({
   }
 
   /* ── Computed outputs ── */
-  const monthlyPmt = trackResult?.rows[0]?.totalPayment ?? null
+  // Grace-aware payments:
+  //   duringGracePmt → what is paid in month 1 (interest-only / 0 during grace)
+  //   monthlyPmt     → first full amortisation payment AFTER grace ends
+  //                    (= rows[0] when there's no grace)
+  const isStandardGrace = (track.graceType === 'partial' || track.graceType === 'full')
+                          && track.graceMonths > 0
+  const duringGracePmt  = isStandardGrace
+    ? (trackResult?.rows[0]?.totalPayment ?? null)
+    : null
+  const monthlyPmt = isStandardGrace && trackResult && trackResult.rows.length > track.graceMonths
+    ? trackResult.rows[track.graceMonths].totalPayment          // first month after grace
+    : (trackResult?.rows[0]?.totalPayment ?? null)
+
   const perShekel  = trackResult && track.amount > 0
     ? trackResult.totalPayment / track.amount
     : null
@@ -350,12 +362,20 @@ export function TrackRow({
         <GraceCell track={track} forGrace="full" upd={upd} />
       </td>
 
-      {/* 11 ── תשלום חודשי */}
+      {/* 11 ── תשלום חודשי (לאחר גרייס) + תשלום בגרייס כשורה משנה */}
       <td className={`${TD} w-[86px]`}>
-        {monthlyPmt !== null
-          ? <div className={RO}>{formatCurrencyWhole(monthlyPmt)}</div>
-          : <div className={NA}>—</div>
-        }
+        {monthlyPmt !== null ? (
+          <div className="flex flex-col items-center gap-px">
+            <div className={RO}>{formatCurrencyWhole(monthlyPmt)}</div>
+            {duringGracePmt !== null && (
+              <span className="text-[9px] tabular-nums text-kumu-navy-light dark:text-kumu-blue-lighter/60 leading-tight">
+                גרייס: {formatCurrencyWhole(duringGracePmt)}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className={NA}>—</div>
+        )}
       </td>
 
       {/* 12 ── עלות לשקל */}
