@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Trash2, Banknote } from 'lucide-react'
 import { useMixStore } from '@/store/useMixStore'
 import { validateTrackAmount, validateTrackMonths, validateAnnualRate } from '@/utils/validation'
-import { formatNumber, formatCurrencyWhole } from '@/utils/format'
+import { formatNumber, formatCurrencyWhole, roundMoney } from '@/utils/format'
+import { MAX_LOAN_MONTHS } from '@/utils/constants'
 import type { LoanTrack, TrackType, GraceType, RateChangePeriod, TrackResult } from '@/types/track'
 import type { MacroForecasts } from '@/types/macro'
 import type { MixId } from '@/types/mix'
@@ -79,30 +80,75 @@ const NA = [
 const ERR = 'border-kumu-error/60 bg-red-50 dark:bg-red-900/10'
 const TD  = 'px-[3px] py-[3px] align-middle'
 
-/* ── Amount input — formatted on blur, raw on focus ───────────────────────── */
+/* ── Amount cell — ₪ or % mode with toggle ───────────────────────────────── */
 
-function AmountCell({ value, onChange, hasError }: {
-  value: number; onChange: (n: number) => void; hasError?: boolean
+function AmountCell({
+  value, onChange, mortgageAmount, hasError,
+}: {
+  value: number; onChange: (n: number) => void; mortgageAmount: number; hasError?: boolean
 }) {
+  const [mode, setMode]   = useState<'₪' | '%'>('₪')
   const [focused, setFocused] = useState(false)
   const [raw, setRaw]         = useState('')
+
+  const pct = mortgageAmount > 0 ? (value / mortgageAmount) * 100 : 0
+
+  const displayValue = focused
+    ? raw
+    : mode === '₪'
+      ? formatNumber(Math.round(value))
+      : pct.toFixed(2)
+
+  const handleFocus = () => {
+    setFocused(true)
+    setRaw(mode === '₪' ? String(Math.round(value)) : pct.toFixed(2))
+  }
+
+  const handleBlur = () => {
+    setFocused(false)
+    if (mode === '₪') {
+      const n = parseInt(raw.replace(/[^\d]/g, ''), 10)
+      onChange(!isNaN(n) && n >= 0 ? n : value)
+    } else {
+      const p = parseFloat(raw.replace(/[^\d.]/g, ''))
+      if (!isNaN(p) && p >= 0 && mortgageAmount > 0) {
+        onChange(Math.round(roundMoney(mortgageAmount * p / 100)))
+      }
+    }
+  }
+
   return (
-    <input
-      type="text" inputMode="numeric" dir="ltr"
-      value={focused ? raw : formatNumber(Math.round(value))}
-      onFocus={() => { setFocused(true); setRaw(String(Math.round(value))) }}
-      onBlur={() => {
-        setFocused(false)
-        const n = parseInt(raw.replace(/\D/g, ''), 10)
-        onChange(!isNaN(n) && n >= 0 ? n : value)
-      }}
-      onChange={e => setRaw(e.target.value.replace(/\D/g, ''))}
-      className={[I, hasError ? ERR : ''].join(' ')}
-    />
+    <div className="flex items-center gap-[2px]">
+      <input
+        type="text"
+        inputMode="decimal"
+        dir="ltr"
+        value={displayValue}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onChange={e => setRaw(e.target.value)}
+        className={[I, 'flex-1 min-w-0', hasError ? ERR : ''].join(' ')}
+      />
+      {/* ₪ / % mode toggle */}
+      <button
+        type="button"
+        onClick={() => setMode(m => m === '₪' ? '%' : '₪')}
+        title={mode === '₪' ? 'עבור להזנה באחוזים' : 'עבור להזנה בשקלים'}
+        className={[
+          'flex-shrink-0 h-[26px] w-[20px] flex items-center justify-center',
+          'rounded text-[9px] font-bold leading-none transition-colors select-none',
+          mode === '%'
+            ? 'bg-kumu-blue/15 dark:bg-kumu-blue/25 text-kumu-blue dark:text-kumu-blue-lighter'
+            : 'bg-gray-100 dark:bg-kumu-navy/80 text-kumu-navy-light dark:text-kumu-blue-lighter/70 hover:bg-kumu-blue/10 hover:text-kumu-blue',
+        ].join(' ')}
+      >
+        {mode === '₪' ? '%' : '₪'}
+      </button>
+    </div>
   )
 }
 
-/* ── Grace column — partial or full only (balloon lives in schedule dropdown) */
+/* ── Grace column — partial or full (validates grace < track months) ─────── */
 
 function GraceCell({ track, forGrace, upd }: {
   track:    LoanTrack
@@ -125,15 +171,23 @@ function GraceCell({ track, forGrace, upd }: {
   const isBalloon = track.graceType === 'balloon-partial' || track.graceType === 'balloon-full'
   if (isBalloon) return <div className={NA}>—</div>
 
+  // Validate: grace period must be strictly less than total months
+  const graceErr = isActive && track.graceMonths > 0 && track.graceMonths >= track.months
+
   return (
     <input
       type="number"
       value={isActive && track.graceMonths > 0 ? track.graceMonths : ''}
-      placeholder="—"
-      min={0}
+      placeholder="חודשים"
+      min={1}
       max={track.months - 1}
       onChange={handleChange}
-      className={[I, !isActive ? 'placeholder:text-gray-300' : ''].join(' ')}
+      title={`גרייס — תקופה בחודשים (מקסימום ${track.months - 1})`}
+      className={[
+        I,
+        !isActive ? 'placeholder:text-gray-300 dark:placeholder:text-kumu-navy-light/40' : '',
+        graceErr ? ERR : '',
+      ].join(' ')}
     />
   )
 }
@@ -152,8 +206,9 @@ export interface TrackRowProps {
 export function TrackRow({
   track, mixId, index, mortgageAmount, trackResult,
 }: TrackRowProps) {
-  const updateTrack = useMixStore(s => s.updateTrack)
-  const removeTrack = useMixStore(s => s.removeTrack)
+  const updateTrack   = useMixStore(s => s.updateTrack)
+  const removeTrack   = useMixStore(s => s.removeTrack)
+  const addPrepayment = useMixStore(s => s.addPrepayment)
   const upd = (partial: Partial<LoanTrack>) => updateTrack(mixId, track.id, partial)
 
   /* ── Validation ── */
@@ -175,16 +230,16 @@ export function TrackRow({
   const handleScheduleChange = (val: ScheduleDisplay) => {
     switch (val) {
       case 'spitzer':
-        upd({ schedule: 'spitzer',        graceType: 'none',             graceMonths: 0 })
+        upd({ schedule: 'spitzer',        graceType: 'none',            graceMonths: 0             })
         break
       case 'equalPrincipal':
-        upd({ schedule: 'equalPrincipal', graceType: 'none',             graceMonths: 0 })
+        upd({ schedule: 'equalPrincipal', graceType: 'none',            graceMonths: 0             })
         break
       case 'balloon-partial':
-        upd({ schedule: 'spitzer',        graceType: 'balloon-partial',  graceMonths: track.months })
+        upd({ schedule: 'spitzer',        graceType: 'balloon-partial', graceMonths: track.months  })
         break
       case 'balloon-full':
-        upd({ schedule: 'spitzer',        graceType: 'balloon-full',     graceMonths: track.months })
+        upd({ schedule: 'spitzer',        graceType: 'balloon-full',    graceMonths: track.months  })
         break
     }
   }
@@ -195,7 +250,7 @@ export function TrackRow({
     ? trackResult.totalPayment / track.amount
     : null
 
-  /* ── Allocation % ── */
+  /* ── Allocation % (read-only display) ── */
   const allocPct = mortgageAmount > 0
     ? ((track.amount / mortgageAmount) * 100).toFixed(1) + '%'
     : '—'
@@ -250,21 +305,33 @@ export function TrackRow({
         </div>
       </td>
 
-      {/* 5 ── סכום ₪ */}
-      <td className={`${TD} w-[88px]`}>
-        <AmountCell value={track.amount} onChange={v => upd({ amount: v })} hasError={amtErr} />
+      {/* 5 ── סכום ₪ / % — dual-mode input with toggle */}
+      <td className={`${TD} w-[110px]`}>
+        <AmountCell
+          value={track.amount}
+          onChange={v => upd({ amount: v })}
+          mortgageAmount={mortgageAmount}
+          hasError={amtErr}
+        />
       </td>
 
-      {/* 6 ── חודשים */}
+      {/* 6 ── חודשים — hard-capped at MAX_LOAN_MONTHS */}
       <td className={`${TD} w-[52px]`}>
         <input
-          type="number" value={track.months} min={48} max={360} step={12}
-          onChange={e => { const v = parseInt(e.target.value, 10); if (!isNaN(v)) upd({ months: v }) }}
+          type="number"
+          value={track.months}
+          min={48}
+          max={MAX_LOAN_MONTHS}
+          step={12}
+          onChange={e => {
+            const v = parseInt(e.target.value, 10)
+            if (!isNaN(v)) upd({ months: Math.min(MAX_LOAN_MONTHS, Math.max(48, v)) })
+          }}
           className={[I, monErr ? ERR : ''].join(' ')}
         />
       </td>
 
-      {/* 7 ── ריבית % — ניתן לעריכה ישירה לכל סוגי המסלולים */}
+      {/* 7 ── ריבית % */}
       <td className={`${TD} w-[56px]`}>
         <input
           type="number" value={track.annualRate} min={0} max={30} step={0.05} dir="ltr"
@@ -290,12 +357,12 @@ export function TrackRow({
         )}
       </td>
 
-      {/* 9 ── גרייס חלקי (חודשים) */}
+      {/* 9 ── גרייס חלקי (חודשים, עם ולידציה) */}
       <td className={`${TD} w-[60px]`}>
         <GraceCell track={track} forGrace="partial" upd={upd} />
       </td>
 
-      {/* 10 ── גרייס מלא (חודשים) */}
+      {/* 10 ── גרייס מלא (חודשים, עם ולידציה) */}
       <td className={`${TD} w-[56px]`}>
         <GraceCell track={track} forGrace="full" upd={upd} />
       </td>
@@ -318,11 +385,17 @@ export function TrackRow({
         }
       </td>
 
-      {/* 13 ── פירעון מוקדם */}
+      {/* 13 ── פירעון מוקדם — מוסיף ישירות ל-Store עם ברירת מחדל */}
       <td className={`${TD} w-7 text-center`}>
         <button
           type="button"
-          title="הוסף פירעון מוקדם"
+          title="הוסף פירעון מוקדם למסלול זה"
+          onClick={() => addPrepayment(mixId, {
+            month:   12,
+            amount:  50_000,
+            trackId: track.id,
+            mode:    'shortenTerm',
+          })}
           className="p-1 rounded text-kumu-navy-light dark:text-kumu-blue-lighter/50 hover:text-kumu-blue hover:bg-kumu-blue/10 transition-colors"
         >
           <Banknote size={12} />

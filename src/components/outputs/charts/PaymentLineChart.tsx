@@ -1,6 +1,6 @@
 /**
  * PaymentLineChart — monthly total payment over the full loan life.
- * Includes vertical reference lines for rate-change stations and prepayments.
+ * X-axis: years (1, 2, 3 …).  Y-axis: ₪ in clean 1 K-step ticks.
  */
 
 import { useMemo } from 'react'
@@ -15,48 +15,37 @@ import {
   getChartTooltipStyle, getChartAxisStyle,
   CHART_GRID_COLOR_LIGHT, CHART_GRID_COLOR_DARK,
 } from '@/utils/chartTheme'
-import { formatCurrencyWhole } from '@/utils/format'
+import { formatCurrencyWhole, formatNumber } from '@/utils/format'
 import type { MixId } from '@/types/mix'
-import type { LoanTrack } from '@/types/track'
 
 // ---------------------------------------------------------------------------
-// Helpers — derive notable months
+// Notable months — prepayments only (rate-change lines removed for clarity)
 // ---------------------------------------------------------------------------
-function getRateChangePeriod(track: LoanTrack): number | null {
-  switch (track.type) {
-    case 'prime':
-    case 'variable-makam':
-    case 'usd':
-    case 'eur':
-      return 12
-    case 'variable-linked':
-    case 'variable-unlinked':
-      return track.rateChangePeriod ?? 60
-    default:
-      return null
-  }
+function getPrepaymentMonths(prepayments: { month: number }[]): Set<number> {
+  return new Set(prepayments.map((p) => p.month))
 }
 
-interface NotableMonths {
-  rateChanges: Set<number>
-  prepaymentMonths: Set<number>
-}
+// ---------------------------------------------------------------------------
+// Y-axis tick computation — adaptive step so there are 5-8 ticks
+// ---------------------------------------------------------------------------
+function computeYTicks(values: number[]): { ticks: number[]; domain: [number, number] } {
+  if (values.length === 0) return { ticks: [], domain: [0, 10_000] }
+  const minVal = Math.min(...values)
+  const maxVal = Math.max(...values)
+  const range  = maxVal - minVal || 1_000
 
-function getNotableMonths(
-  tracks: LoanTrack[],
-  prepayments: { month: number }[],
-): NotableMonths {
-  const rateChanges = new Set<number>()
-  for (const t of tracks) {
-    const period = getRateChangePeriod(t)
-    if (period) {
-      for (let m = period + 1; m <= t.months; m += period) {
-        rateChanges.add(m)
-      }
-    }
-  }
-  const prepaymentMonths = new Set(prepayments.map((p) => p.month))
-  return { rateChanges, prepaymentMonths }
+  // Pick a nice step that yields ~5-8 ticks
+  let step = 1_000
+  if      (range > 80_000) step = 20_000
+  else if (range > 40_000) step = 10_000
+  else if (range > 20_000) step =  5_000
+  else if (range > 10_000) step =  2_000
+
+  const lo = Math.floor(minVal / step) * step
+  const hi = Math.ceil(maxVal  / step) * step
+  const ticks: number[] = []
+  for (let v = lo; v <= hi; v += step) ticks.push(v)
+  return { ticks, domain: [lo, hi] }
 }
 
 // ---------------------------------------------------------------------------
@@ -76,7 +65,7 @@ function CustomTooltip({
   return (
     <div style={getChartTooltipStyle(isDark)}>
       <p className="font-medium text-[13px]" style={{ color: isDark ? '#F4F7FB' : '#1A2456' }}>
-        חודש {month} (שנה {year})
+        חודש {month} · שנה {year}
       </p>
       <p className="text-[12px]" style={{ color: isDark ? '#A5B8FF' : '#6B7280' }}>
         החזר: {formatCurrencyWhole(payload[0].value ?? 0)}
@@ -116,15 +105,38 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
       .map(([month, payment]) => ({ month, payment }))
   }, [result.trackResults])
 
-  const { prepaymentMonths } = useMemo(
-    () => getNotableMonths(mix.tracks, mix.prepayments),
-    [mix.tracks, mix.prepayments],
+  const prepaymentMonths = useMemo(
+    () => getPrepaymentMonths(mix.prepayments),
+    [mix.prepayments],
+  )
+
+  // ── X-axis: one tick per year (every 12 months) ──
+  const xTicks = useMemo(() => {
+    if (chartData.length === 0) return []
+    const maxMonth = chartData[chartData.length - 1]?.month ?? 0
+    const ticks: number[] = []
+    for (let m = 12; m <= maxMonth; m += 12) ticks.push(m)
+    return ticks
+  }, [chartData])
+
+  // ── Y-axis: adaptive 1 K-step ticks ──
+  const { ticks: yTicks, domain: yDomain } = useMemo(
+    () => computeYTicks(chartData.map(d => d.payment)),
+    [chartData],
   )
 
   const axisStyle = getChartAxisStyle(isDark)
   const gridColor = isDark ? CHART_GRID_COLOR_DARK : CHART_GRID_COLOR_LIGHT
 
   const isEmpty = chartData.length === 0
+
+  // Shared tick style — Heebo, clean, no bold
+  const tickStyle = {
+    fontFamily: 'Heebo, sans-serif',
+    fontSize:   10,
+    fill:       axisStyle.fill,
+    fontWeight: 400,
+  }
 
   return (
     <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
@@ -143,8 +155,8 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
             </p>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={220}>
-            <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={230}>
+            <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 16 }}>
               <defs>
                 <linearGradient id={`lineGrad-${mixId}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%"  stopColor="#3B5BDB" stopOpacity={0.08} />
@@ -159,21 +171,31 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
                 vertical={false}
               />
 
+              {/* X-axis — year numbers (pure integers, no Hebrew mixing) */}
               <XAxis
                 dataKey="month"
+                ticks={xTicks}
                 tickLine={false}
                 axisLine={false}
-                tick={{ ...axisStyle, fontSize: 10 }}
-                tickFormatter={(m: number) => `${Math.ceil(m / 12)}ש'`}
-                interval={Math.floor(chartData.length / 8)}
+                tick={tickStyle}
+                tickFormatter={(m: number) => String(Math.ceil(m / 12))}
+                label={{
+                  value: 'שנה',
+                  position: 'insideBottomLeft',
+                  offset: 0,
+                  style: { fontFamily: 'Heebo, sans-serif', fontSize: 10, fill: axisStyle.fill },
+                }}
               />
 
+              {/* Y-axis — ₪ values in clean K-steps */}
               <YAxis
+                ticks={yTicks}
+                domain={yDomain}
                 tickLine={false}
                 axisLine={false}
-                tick={{ ...axisStyle, fontSize: 10 }}
-                tickFormatter={(v: number) => `₪${Math.round(v / 1000)}K`}
-                width={46}
+                tick={tickStyle}
+                tickFormatter={(v: number) => `₪${formatNumber(v)}`}
+                width={68}
               />
 
               <Tooltip
@@ -224,3 +246,5 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
     </div>
   )
 }
+
+

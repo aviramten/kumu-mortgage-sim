@@ -17,9 +17,11 @@ function BalanceIndicator({
   const gap       = mortgageAmount - allocated
   const absGap    = Math.abs(gap)
 
+  // Any overrun (gap < 0) is always a hard error, regardless of amount
   const tier =
-    absGap <= BALANCE_OK_THRESHOLD   ? 'ok'   :
-    absGap <= BALANCE_WARN_THRESHOLD ? 'warn' : 'error'
+    gap < 0                          ? 'error' :
+    absGap <= BALANCE_OK_THRESHOLD   ? 'ok'    :
+    absGap <= BALANCE_WARN_THRESHOLD ? 'warn'  : 'error'
 
   const cls = {
     ok:    'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-kumu-green',
@@ -27,10 +29,14 @@ function BalanceIndicator({
     error: 'bg-red-50    dark:bg-red-900/20    border-red-200    dark:border-red-800    text-kumu-error',
   }[tier]
 
+  const overrunPct = mortgageAmount > 0
+    ? ((allocated / mortgageAmount - 1) * 100).toFixed(1)
+    : '0'
+
   const label =
     gap === 0 ? 'כל סכום המשכנתא מוקצה ✓' :
     gap  > 0  ? `נותר להקצאה: ₪${formatNumber(gap)}` :
-                `חריגה של ₪${formatNumber(absGap)}`
+                `⚠ חריגה — ${overrunPct}% מעל סכום המשכנתא. יש להקטין מסלול.`
 
   return (
     <div className={`flex items-center justify-between rounded-lg border px-3 py-1.5 text-xs font-medium ${cls}`}>
@@ -49,7 +55,7 @@ const HEADERS: { label: string; title?: string; cls?: string }[] = [
   { label: 'מסלול',           cls: 'w-[84px]' },
   { label: 'לוח סילוקין',     cls: 'w-[90px]' },
   { label: '%',               title: 'אחוז מהמשכנתא',           cls: 'w-[46px] text-center' },
-  { label: 'סכום ₪',         cls: 'w-[88px] text-center' },
+  { label: 'סכום ₪ / %',     title: 'הזן סכום בשקלים — לחץ % לעבור לאחוזים', cls: 'w-[110px] text-center' },
   { label: 'חודשים',          title: 'תקופה בחודשים',            cls: 'w-[52px] text-center' },
   { label: 'ריבית %',         cls: 'w-[56px] text-center' },
   { label: 'תדירות עדכון',    title: 'תדירות עדכון ריבית',       cls: 'w-[78px] text-center' },
@@ -118,7 +124,7 @@ export function TracksManager({ mixId }: TracksManagerProps) {
         <div className="overflow-x-auto px-3 pb-3 pt-1">
           <table
             className="w-full border-collapse text-right"
-            style={{ minWidth: 900 }}
+            style={{ minWidth: 930 }}
             dir="rtl"
           >
             {/* Column headers */}
