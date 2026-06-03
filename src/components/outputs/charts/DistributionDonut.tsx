@@ -5,7 +5,7 @@
 
 import { useMemo } from 'react'
 import {
-  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { useThemeStore } from '@/store/useThemeStore'
 import { useMix } from '@/store/useMixStore'
@@ -146,54 +146,62 @@ export function DistributionDonut({ mixId }: DistributionDonutProps) {
             </p>
           </div>
         ) : (
-          <div className="relative" style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={slices}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="40%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={95}
-                  paddingAngle={2}
-                  animationDuration={800}
-                >
-                  {slices.map((s, i) => (
-                    <Cell
-                      key={`cell-${i}`}
-                      fill={s.color}
-                      stroke={isDark ? '#0F1633' : '#fff'}
-                      strokeWidth={2}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-                <Legend
-                  layout="vertical"
-                  align="right"
-                  verticalAlign="middle"
-                  content={<CustomLegend />}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+          /* Split layout: donut (left 60%) + legend (right 40%).
+             Legend is rendered outside Recharts so it cannot shift the pie's cx. */
+          <div style={{ height: 220, display: 'flex', alignItems: 'center', gap: 0 }}>
 
-            {/* Center label — positioned exactly at the donut cx/cy (40% / 50%) */}
-            <div
-              className="absolute text-center pointer-events-none"
-              style={{ left: '40%', top: '50%', transform: 'translate(-50%, -50%)' }}
-            >
-              <p
-                className="text-[15px] font-bold text-kumu-navy dark:text-white tabular-nums leading-tight"
-                dir="ltr"
+            {/* ── Donut area ──────────────────────────────────────────────── */}
+            <div className="relative" style={{ flex: '0 0 60%', height: '100%' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                  <Pie
+                    data={slices}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={95}
+                    paddingAngle={2}
+                    animationDuration={800}
+                  >
+                    {slices.map((s, i) => (
+                      <Cell
+                        key={`cell-${i}`}
+                        fill={s.color}
+                        stroke={isDark ? '#0F1633' : '#fff'}
+                        strokeWidth={2}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+
+              {/* Center label — cx=50% cy=50% so overlay is exactly 50%/50% */}
+              <div
+                className="absolute text-center pointer-events-none"
+                style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
               >
-                ₪{formatNumber(Math.round(total))}
-              </p>
-              <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter mt-0.5">
-                סך הקרן
-              </p>
+                <p
+                  className="text-[15px] font-bold text-kumu-navy dark:text-white tabular-nums leading-tight"
+                  dir="ltr"
+                >
+                  ₪{formatNumber(Math.round(total))}
+                </p>
+                <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter mt-0.5">
+                  סך הקרן
+                </p>
+              </div>
             </div>
+
+            {/* ── Legend area ─────────────────────────────────────────────── */}
+            <div style={{ flex: '0 0 40%', display: 'flex', alignItems: 'center', paddingRight: 4 }}>
+              <CustomLegend
+                payload={slices.map((s) => ({ value: s.name, color: s.color }))}
+              />
+            </div>
+
           </div>
         )}
       </div>
