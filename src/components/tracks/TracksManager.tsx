@@ -1,21 +1,19 @@
+import { useMemo } from 'react'
 import { Plus } from 'lucide-react'
 import { useMix, useMixStore } from '@/store/useMixStore'
+import { calculateMix } from '@/engine/calculateMix'
 import { formatNumber } from '@/utils/format'
 import { BALANCE_OK_THRESHOLD, BALANCE_WARN_THRESHOLD } from '@/utils/constants'
 import { TrackRow } from './TrackRow'
 import type { LoanTrack } from '@/types/track'
 import type { MixId } from '@/types/mix'
 
-// ---------------------------------------------------------------------------
-// BalanceIndicator — real-time allocation vs mortgage amount
-// ---------------------------------------------------------------------------
-interface BalanceIndicatorProps {
-  mortgageAmount: number
-  tracks:         LoanTrack[]
-}
+/* ── Balance indicator ─────────────────────────────────────────────────────── */
 
-function BalanceIndicator({ mortgageAmount, tracks }: BalanceIndicatorProps) {
-  const allocated = tracks.reduce((sum, t) => sum + t.amount, 0)
+function BalanceIndicator({
+  mortgageAmount, tracks,
+}: { mortgageAmount: number; tracks: LoanTrack[] }) {
+  const allocated = tracks.reduce((s, t) => s + t.amount, 0)
   const gap       = mortgageAmount - allocated
   const absGap    = Math.abs(gap)
 
@@ -23,45 +21,68 @@ function BalanceIndicator({ mortgageAmount, tracks }: BalanceIndicatorProps) {
     absGap <= BALANCE_OK_THRESHOLD   ? 'ok'   :
     absGap <= BALANCE_WARN_THRESHOLD ? 'warn' : 'error'
 
-  const colorMap = {
+  const cls = {
     ok:    'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-kumu-green',
-    warn:  'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700 text-amber-700 dark:text-kumu-yellow',
-    error: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-kumu-error',
-  }
+    warn:  'bg-amber-50  dark:bg-amber-900/20  border-amber-200  dark:border-amber-700  text-amber-700 dark:text-kumu-yellow',
+    error: 'bg-red-50    dark:bg-red-900/20    border-red-200    dark:border-red-800    text-kumu-error',
+  }[tier]
 
   const label =
-    gap === 0
-      ? 'כל סכום המשכנתא מוקצה ✓'
-      : gap > 0
-        ? `נותר להקצאה: ₪${formatNumber(gap)}`
-        : `חריגה של ₪${formatNumber(absGap)} מסכום המשכנתא`
+    gap === 0 ? 'כל סכום המשכנתא מוקצה ✓' :
+    gap  > 0  ? `נותר להקצאה: ₪${formatNumber(gap)}` :
+                `חריגה של ₪${formatNumber(absGap)}`
 
   return (
-    <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${colorMap[tier]}`}>
-      <span className="text-xs font-medium">{label}</span>
-      <span className="text-xs tabular-nums font-medium">
+    <div className={`flex items-center justify-between rounded-lg border px-3 py-1.5 text-xs font-medium ${cls}`}>
+      <span>{label}</span>
+      <span className="tabular-nums">
         ₪{formatNumber(allocated)} / ₪{formatNumber(mortgageAmount)}
       </span>
     </div>
   )
 }
 
-// ---------------------------------------------------------------------------
-// TracksManager
-// ---------------------------------------------------------------------------
-interface TracksManagerProps {
-  mixId: MixId
-}
+/* ── Column header definitions ─────────────────────────────────────────────── */
+
+const HEADERS: { label: string; title?: string; cls?: string }[] = [
+  { label: '',         cls: 'w-7'      },  // badge
+  { label: 'מסלול',   cls: 'w-[84px]' },
+  { label: 'לוח',     title: 'לוח סילוקין',          cls: 'w-[64px]' },
+  { label: '%',       title: 'אחוז מהמשכנתא',        cls: 'w-[42px] text-center' },
+  { label: 'סכום ₪', cls: 'w-[88px] text-center' },
+  { label: "ח'",      title: 'תקופה (חודשים)',        cls: 'w-[44px] text-center' },
+  { label: 'עוגן',   title: 'ריבית עוגן (בנצ\'מרק)', cls: 'w-[50px] text-center' },
+  { label: 'תוספת',  title: 'מרווח הבנק מעל העוגן',  cls: 'w-[52px] text-center' },
+  { label: 'ריבית %', cls: 'w-[52px] text-center' },
+  { label: 'תדירות', title: 'תדירות עדכון הריבית',    cls: 'w-[62px] text-center' },
+  { label: 'גרייס ח\'', title: 'גרייס חלקי (חודשים)', cls: 'w-[44px] text-center' },
+  { label: 'גרייס מ\'', title: 'גרייס מלא (חודשים)',  cls: 'w-[44px] text-center' },
+  { label: 'בלון',    title: 'מועד לשחרור (חודשים)', cls: 'w-[44px] text-center' },
+  { label: 'שוט"פ',  title: 'החזר חודשי (חודש 1)',  cls: 'w-[76px] text-center' },
+  { label: '₪/שקל', title: 'סה"כ עלות לכל ₪ מוקצה', cls: 'w-[52px] text-center' },
+  { label: '',         cls: 'w-7'      },  // פירעון
+  { label: '',         cls: 'w-7'      },  // delete
+]
+
+/* ── TracksManager ─────────────────────────────────────────────────────────── */
+
+interface TracksManagerProps { mixId: MixId }
 
 export function TracksManager({ mixId }: TracksManagerProps) {
-  const { tracks, globalInputs } = useMix(mixId)
-  const addTrack                 = useMixStore((s) => s.addTrack)
+  const { tracks, globalInputs, macroForecasts, prepayments } = useMix(mixId)
+  const addTrack = useMixStore(s => s.addTrack)
+
+  /* Run the engine so each row can show שוט"פ + ₪/שקל */
+  const mixResult = useMemo(
+    () => calculateMix(tracks, macroForecasts, prepayments),
+    [tracks, macroForecasts, prepayments],
+  )
 
   return (
     <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
 
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-kumu-navy-light">
+      {/* ── Header bar ──────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-kumu-navy-light">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue">
           מסלולי המשכנתא
         </h2>
@@ -72,11 +93,7 @@ export function TracksManager({ mixId }: TracksManagerProps) {
           <button
             type="button"
             onClick={() => addTrack(mixId)}
-            className={[
-              'flex items-center gap-1 h-7 px-2.5 rounded-lg',
-              'bg-kumu-blue text-white text-xs font-semibold',
-              'hover:bg-kumu-blue-light active:scale-95 transition-all duration-100',
-            ].join(' ')}
+            className="flex items-center gap-1 h-7 px-3 rounded-lg bg-kumu-blue text-white text-xs font-semibold hover:bg-kumu-blue-light active:scale-95 transition-all"
           >
             <Plus size={12} />
             הוסף מסלול
@@ -84,83 +101,66 @@ export function TracksManager({ mixId }: TracksManagerProps) {
         </div>
       </div>
 
-      {/* ── Body ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-2 p-3">
-
-        {/* Balance indicator */}
+      {/* ── Balance indicator ───────────────────────────────────────────────── */}
+      <div className="px-3 pt-2.5 pb-1">
         <BalanceIndicator
           mortgageAmount={globalInputs.mortgageAmount}
           tracks={tracks}
         />
-
-        {/* Empty state */}
-        {tracks.length === 0 && (
-          <p className="text-xs text-center text-kumu-navy-light dark:text-kumu-blue-lighter py-6">
-            טרם נוספו מסלולים. לחץ על "הוסף מסלול" כדי להתחיל.
-          </p>
-        )}
-
-        {/* Tracks table */}
-        {tracks.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border border-gray-100 dark:border-kumu-navy-light/40">
-            <table
-              className="w-full min-w-[520px] border-collapse text-right"
-              dir="rtl"
-            >
-              {/* Column header */}
-              <thead>
-                <tr className="bg-gray-50 dark:bg-kumu-navy-dark/50">
-                  {/* # */}
-                  <th className="px-1 py-1.5 w-6" />
-                  {/* Type */}
-                  <th className="px-1 py-1.5 w-[88px] text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter text-right">
-                    סוג
-                  </th>
-                  {/* Schedule */}
-                  <th className="px-1 py-1.5 w-[76px] text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter text-right">
-                    שיטה
-                  </th>
-                  {/* Amount */}
-                  <th className="px-1 py-1.5 w-[84px] text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter text-center">
-                    סכום ₪
-                  </th>
-                  {/* Months */}
-                  <th className="px-1 py-1.5 w-[52px] text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter text-center">
-                    ח׳
-                  </th>
-                  {/* Rate */}
-                  <th className="px-1 py-1.5 w-[52px] text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter text-center">
-                    ריבית %
-                  </th>
-                  {/* Grace type */}
-                  <th className="px-1 py-1.5 w-[76px] text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter text-right">
-                    גרייס
-                  </th>
-                  {/* Grace months */}
-                  <th className="px-1 py-1.5 w-[44px] text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter text-center">
-                    ח"ג
-                  </th>
-                  {/* Actions */}
-                  <th className="px-1 py-1.5 w-10" />
-                </tr>
-              </thead>
-
-              {/* Track rows */}
-              <tbody>
-                {tracks.map((track, idx) => (
-                  <TrackRow
-                    key={track.id}
-                    track={track}
-                    mixId={mixId}
-                    index={idx + 1}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
       </div>
+
+      {/* ── Empty state ─────────────────────────────────────────────────────── */}
+      {tracks.length === 0 && (
+        <p className="text-xs text-center text-kumu-navy-light dark:text-kumu-blue-lighter py-5">
+          לחץ על "הוסף מסלול" כדי להתחיל לבנות את התמהיל.
+        </p>
+      )}
+
+      {/* ── Table ───────────────────────────────────────────────────────────── */}
+      {tracks.length > 0 && (
+        <div className="overflow-x-auto px-3 pb-3 pt-1">
+          <table
+            className="w-full border-collapse text-right"
+            style={{ minWidth: 900 }}
+            dir="rtl"
+          >
+            {/* Column headers */}
+            <thead>
+              <tr className="bg-gray-50 dark:bg-kumu-navy-dark/50">
+                {HEADERS.map((h, i) => (
+                  <th
+                    key={i}
+                    title={h.title}
+                    className={[
+                      'px-[3px] py-1.5',
+                      'text-[10px] font-semibold uppercase tracking-wide',
+                      'text-kumu-navy-light dark:text-kumu-blue-lighter',
+                      h.cls ?? '',
+                    ].join(' ')}
+                  >
+                    {h.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+
+            {/* Track rows */}
+            <tbody>
+              {tracks.map((track, idx) => (
+                <TrackRow
+                  key={track.id}
+                  track={track}
+                  mixId={mixId}
+                  index={idx + 1}
+                  mortgageAmount={globalInputs.mortgageAmount}
+                  macro={macroForecasts}
+                  trackResult={mixResult.trackResults.find(r => r.trackId === track.id)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

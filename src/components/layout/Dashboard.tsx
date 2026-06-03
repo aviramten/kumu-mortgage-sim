@@ -72,37 +72,33 @@ function MixBEmptyState() {
 }
 
 // ---------------------------------------------------------------------------
-// Mix tab outputs column
-// ---------------------------------------------------------------------------
-function MixOutputs({ mixId }: { mixId: MixId }) {
-  return (
-    <div className="flex flex-col gap-3 overflow-y-auto">
-      <KPIDashboard      mixId={mixId} />
-      <DistributionDonut mixId={mixId} />
-      <PaymentLineChart  mixId={mixId} />
-      <CostBreakdownBars mixId={mixId} />
-      <AmortizationTable mixId={mixId} />
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Mix tab content — inputs left + outputs right (RTL: inputs on right)
+// Mix tab content — stacked layout: top inputs+KPI / full-width table / charts
 // ---------------------------------------------------------------------------
 function MixTabContent({ mixId }: { mixId: MixId }) {
   return (
-    <div className="flex-1 grid grid-cols-[2fr_3fr] gap-4 p-4 min-h-0 overflow-hidden">
+    <div className="flex flex-col gap-4 p-4">
 
-      {/* Inputs column — 40%, RIGHT in RTL */}
-      <div className="flex flex-col gap-3 overflow-y-auto">
-        <GlobalInputs     mixId={mixId} />
-        <TracksManager    mixId={mixId} />
-        <PrepaymentEvents mixId={mixId} />
-        <MacroForecasts   mixId={mixId} />
+      {/* ── Row 1: Global inputs (RIGHT in RTL) + KPI summary (LEFT) ────── */}
+      <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-4 items-start">
+        <div className="flex flex-col gap-3">
+          <GlobalInputs   mixId={mixId} />
+          <MacroForecasts mixId={mixId} />
+        </div>
+        <KPIDashboard mixId={mixId} />
       </div>
 
-      {/* Outputs column — 60%, LEFT in RTL */}
-      <MixOutputs mixId={mixId} />
+      {/* ── Row 2: Full-width tracks table ──────────────────────────────── */}
+      <TracksManager    mixId={mixId} />
+      <PrepaymentEvents mixId={mixId} />
+
+      {/* ── Row 3: Charts (two-column grid) ─────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-4">
+        <DistributionDonut mixId={mixId} />
+        <PaymentLineChart  mixId={mixId} />
+      </div>
+      <CostBreakdownBars mixId={mixId} />
+      <AmortizationTable mixId={mixId} />
+
     </div>
   )
 }
@@ -115,11 +111,7 @@ function MixBTab() {
   const hasStarted = mixB.tracks.length > 0
 
   if (!hasStarted) {
-    return (
-      <div className="flex-1 flex flex-col min-h-0">
-        <MixBEmptyState />
-      </div>
-    )
+    return <MixBEmptyState />
   }
 
   return <MixTabContent mixId="b" />
@@ -146,11 +138,13 @@ export function Dashboard() {
   }, [navigate])
 
   return (
-    <div className="h-screen flex flex-col bg-kumu-bg-light dark:bg-kumu-bg-dark overflow-hidden">
+    <div className="min-h-screen flex flex-col bg-kumu-bg-light dark:bg-kumu-bg-dark">
+      {/* ── Sticky top bar: header + nav ─────────────────────────────────── */}
+      <div className="sticky top-0 z-50 flex flex-col">
       <Header />
 
       {/* Tab navigation */}
-      <nav className="tabs-nav flex-shrink-0 flex items-stretch bg-white dark:bg-kumu-surface-dark border-b border-gray-100 dark:border-kumu-navy-light px-6 no-print">
+      <nav className="tabs-nav flex items-stretch bg-white dark:bg-kumu-surface-dark border-b border-gray-100 dark:border-kumu-navy-light px-6 no-print shadow-sm">
         {TABS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
@@ -187,9 +181,10 @@ export function Dashboard() {
           </NavLink>
         )}
       </nav>
+      </div>{/* end sticky top bar */}
 
-      {/* Route content */}
-      <div className="flex-1 flex flex-col min-h-0">
+      {/* ── Page content — scrolls naturally ─────────────────────────────── */}
+      <div className="flex-1 flex flex-col">
         <Routes>
           <Route path="/mix-a"      element={<MixTabContent mixId="a" />} />
           <Route path="/mix-b"      element={<MixBTab />} />
