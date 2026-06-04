@@ -157,7 +157,7 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={230}>
-            <ComposedChart data={chartData} margin={{ top: 8, right: 16, left: 4, bottom: 20 }}>
+            <ComposedChart data={chartData} margin={{ top: 8, right: 20, left: 8, bottom: 20 }}>
               <defs>
                 <linearGradient id={`lineGrad-${mixId}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%"  stopColor="#3B5BDB" stopOpacity={0.08} />
@@ -180,6 +180,7 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
                 axisLine={{ stroke: gridColor, strokeWidth: 1.5, strokeOpacity: 0.9 }}
                 tick={{ ...tickStyle, dy: 6 }}
                 tickFormatter={(m: number) => String(Math.ceil(m / 12))}
+                padding={{ left: 24, right: 16 }}
                 label={{
                   value: 'שנה',
                   position: 'insideBottomLeft',
@@ -196,7 +197,7 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
                 axisLine={{ stroke: gridColor, strokeWidth: 1.5, strokeOpacity: 0.9 }}
                 tick={{ ...tickStyle, dx: -4 }}
                 tickFormatter={(v: number) => `₪${formatNumber(v)}`}
-                width={72}
+                width={76}
               />
 
               <Tooltip
