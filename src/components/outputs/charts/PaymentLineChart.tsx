@@ -41,7 +41,8 @@ function computeYTicks(values: number[]): { ticks: number[]; domain: [number, nu
   else if (range > 20_000) step =  5_000
   else if (range > 10_000) step =  2_000
 
-  const lo = Math.floor(minVal / step) * step
+  // Never start below ₪1,000 — avoids ticks at 0 / 500 etc.
+  const lo = Math.max(1_000, Math.floor(minVal / step) * step)
   const hi = Math.ceil(maxVal  / step) * step
   const ticks: number[] = []
   for (let v = lo; v <= hi; v += step) ticks.push(v)
@@ -156,7 +157,7 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={230}>
-            <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 16 }}>
+            <ComposedChart data={chartData} margin={{ top: 8, right: 16, left: 4, bottom: 20 }}>
               <defs>
                 <linearGradient id={`lineGrad-${mixId}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%"  stopColor="#3B5BDB" stopOpacity={0.08} />
@@ -171,31 +172,31 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
                 vertical={false}
               />
 
-              {/* X-axis — year numbers (pure integers, no Hebrew mixing) */}
+              {/* X-axis — year numbers, with a separating border line */}
               <XAxis
                 dataKey="month"
                 ticks={xTicks}
                 tickLine={false}
-                axisLine={false}
-                tick={tickStyle}
+                axisLine={{ stroke: gridColor, strokeWidth: 1.5, strokeOpacity: 0.9 }}
+                tick={{ ...tickStyle, dy: 6 }}
                 tickFormatter={(m: number) => String(Math.ceil(m / 12))}
                 label={{
                   value: 'שנה',
                   position: 'insideBottomLeft',
-                  offset: 0,
+                  offset: -4,
                   style: { fontFamily: 'Heebo, sans-serif', fontSize: 10, fill: axisStyle.fill },
                 }}
               />
 
-              {/* Y-axis — ₪ values in clean K-steps */}
+              {/* Y-axis — ₪ values in clean K-steps, with a separating border line */}
               <YAxis
                 ticks={yTicks}
                 domain={yDomain}
                 tickLine={false}
-                axisLine={false}
-                tick={tickStyle}
+                axisLine={{ stroke: gridColor, strokeWidth: 1.5, strokeOpacity: 0.9 }}
+                tick={{ ...tickStyle, dx: -4 }}
                 tickFormatter={(v: number) => `₪${formatNumber(v)}`}
-                width={68}
+                width={72}
               />
 
               <Tooltip
