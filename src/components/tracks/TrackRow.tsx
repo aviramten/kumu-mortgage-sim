@@ -137,6 +137,32 @@ function AmountCell({ value, onChange, hasError }: {
   )
 }
 
+/* ── Months cell — free text input 1-360, no browser blocking ───────────── */
+
+function MonthsCell({ value, onChange, hasError }: {
+  value: number; onChange: (n: number) => void; hasError?: boolean
+}) {
+  const [focused, setFocused] = useState(false)
+  const [raw, setRaw]         = useState('')
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      dir="ltr"
+      value={focused ? raw : String(value)}
+      onFocus={() => { setFocused(true); setRaw(String(value)) }}
+      onBlur={() => {
+        setFocused(false)
+        const n = parseInt(raw.replace(/\D/g, ''), 10)
+        if (!isNaN(n) && n >= 1) onChange(Math.min(MAX_LOAN_MONTHS, n))
+        else onChange(value) // revert on empty/invalid
+      }}
+      onChange={e => setRaw(e.target.value.replace(/\D/g, ''))}
+      className={[I, hasError ? ERR : ''].join(' ')}
+    />
+  )
+}
+
 /* ── Grace column — validates grace < track months ───────────────────────── */
 
 function GraceCell({ track, forGrace, upd }: {
@@ -310,19 +336,12 @@ export function TrackRow({
         />
       </td>
 
-      {/* 6 ── חודשים — חסום ל-MAX_LOAN_MONTHS */}
+      {/* 6 ── חודשים — free input 1-360 */}
       <td className={`${TD} w-[52px]`}>
-        <input
-          type="number"
+        <MonthsCell
           value={track.months}
-          min={48}
-          max={MAX_LOAN_MONTHS}
-          step={12}
-          onChange={e => {
-            const v = parseInt(e.target.value, 10)
-            if (!isNaN(v)) upd({ months: Math.min(MAX_LOAN_MONTHS, Math.max(48, v)) })
-          }}
-          className={[I, monErr ? ERR : ''].join(' ')}
+          onChange={v => upd({ months: v })}
+          hasError={monErr}
         />
       </td>
 
