@@ -17,6 +17,7 @@ import { PaymentLineChart } from '@/components/outputs/charts/PaymentLineChart'
 import { CostBreakdownBars } from '@/components/outputs/charts/CostBreakdownBars'
 import { AmortizationTable } from '@/components/outputs/AmortizationTable'
 import { InvestmentTab } from '@/components/investment/InvestmentTab'
+import { TransactionCostsTab } from '@/components/costs/TransactionCostsTab'
 import { useMix, useMixStore } from '@/store/useMixStore'
 import type { MixId } from '@/types/mix'
 
@@ -37,7 +38,7 @@ const TABS = [
   { to: '/mix-b',      label: "תמהיל ב'",     icon: BarChart3   },
   { to: '/mix-c',      label: "תמהיל ג'",     icon: BarChart3   },
   { to: '/comparison', label: 'השוואה',        icon: GitCompare  },
-  { to: '/expenses',   label: 'הוצאות עסקה',  icon: Receipt     },
+  { to: '/costs',      label: 'הוצאות עסקה',  icon: Receipt     },
   { to: '/capacity',   label: 'כושר החזר',    icon: ShieldCheck },
   { to: '/investment', label: 'מחשבון השקעה', icon: TrendingUp  },
 ] as const
@@ -281,7 +282,7 @@ export function Dashboard() {
         case '2': e.preventDefault(); navigate('/mix-b');      break
         case '3': e.preventDefault(); navigate('/mix-c');      break
         case '4': e.preventDefault(); navigate('/comparison'); break
-        case '5': e.preventDefault(); navigate('/expenses');   break
+        case '5': e.preventDefault(); navigate('/costs');      break
         case '6': e.preventDefault(); navigate('/capacity');   break
         case '7': e.preventDefault(); navigate('/investment'); break
       }
@@ -322,12 +323,9 @@ export function Dashboard() {
           <Route path="/mix-b"      element={<MixBTab />} />
           <Route path="/mix-c"      element={<MixCTab />} />
           <Route path="/comparison" element={<ComparisonTab />} />
-          <Route path="/expenses"   element={
-            <PlaceholderTab
-              title="הוצאות עסקה"
-              description="חישוב מס רכישה, שכר טרחת עורך דין, עמלות תיווך וכל עלות נלווית לעסקה — בקרוב."
-            />
-          } />
+          <Route path="/costs"      element={<TransactionCostsTab />} />
+          {/* Redirect old /expenses URL (from Stage 7 deploy) */}
+          <Route path="/expenses"   element={<Navigate to="/costs" replace />} />
           <Route path="/capacity"   element={
             <PlaceholderTab
               title="כושר החזר"
