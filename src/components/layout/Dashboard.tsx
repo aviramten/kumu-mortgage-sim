@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import {
   BarChart3, TrendingUp, LayoutList, Copy, GitCompare,
@@ -18,7 +18,11 @@ import { CostBreakdownBars } from '@/components/outputs/charts/CostBreakdownBars
 import { AmortizationTable } from '@/components/outputs/AmortizationTable'
 import { InvestmentTab } from '@/components/investment/InvestmentTab'
 import { TransactionCostsTab } from '@/components/costs/TransactionCostsTab'
+import { AffordabilityTab } from '@/components/affordability/AffordabilityTab'
 import { useMix, useMixStore } from '@/store/useMixStore'
+import { useAffordabilityStore } from '@/store/useAffordabilityStore'
+import { calculateMix } from '@/engine/calculateMix'
+import { calculatePTI } from '@/engine/pti'
 import type { MixId } from '@/types/mix'
 
 // ---------------------------------------------------------------------------
@@ -32,15 +36,16 @@ const MIX_LABELS: Record<MixId, string> = {
 
 // ---------------------------------------------------------------------------
 // Tab configuration — order = right-to-left in RTL layout
+// mixId is set for mix tabs so we can attach PTI badges to them
 // ---------------------------------------------------------------------------
 const TABS = [
-  { to: '/mix-a',      label: "תמהיל א'",     icon: LayoutList  },
-  { to: '/mix-b',      label: "תמהיל ב'",     icon: BarChart3   },
-  { to: '/mix-c',      label: "תמהיל ג'",     icon: BarChart3   },
-  { to: '/comparison', label: 'השוואה',        icon: GitCompare  },
-  { to: '/costs',      label: 'הוצאות עסקה',  icon: Receipt     },
-  { to: '/capacity',   label: 'כושר החזר',    icon: ShieldCheck },
-  { to: '/investment', label: 'מחשבון השקעה', icon: TrendingUp  },
+  { to: '/mix-a',        label: "תמהיל א'",     icon: LayoutList,  mixId: 'a' as MixId },
+  { to: '/mix-b',        label: "תמהיל ב'",     icon: BarChart3,   mixId: 'b' as MixId },
+  { to: '/mix-c',        label: "תמהיל ג'",     icon: BarChart3,   mixId: 'c' as MixId },
+  { to: '/comparison',   label: 'השוואה',        icon: GitCompare,  mixId: undefined    },
+  { to: '/costs',        label: 'הוצאות עסקה',  icon: Receipt,     mixId: undefined    },
+  { to: '/affordability',label: 'כושר החזר',    icon: ShieldCheck, mixId: undefined    },
+  { to: '/investment',   label: 'מחשבון השקעה', icon: TrendingUp,  mixId: undefined    },
 ] as const
 
 // ---------------------------------------------------------------------------
@@ -62,6 +67,27 @@ function PlaceholderTab({ title, description }: { title: string; description: st
         בקרוב
       </span>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// PTI badge — shows "!40+" on a mix tab when that mix exceeds the 40% limit
+// Visible only when affordability data has been entered (totalIncome > 0).
+// ---------------------------------------------------------------------------
+function PTIBadge({ mixId, dispIncome }: { mixId: MixId; dispIncome: number }) {
+  const mix = useMix(mixId)
+
+  const exceeds = useMemo(() => {
+    if (mix.tracks.length === 0) return false
+    const { kpis } = calculateMix(mix.tracks, mix.macroForecasts, mix.prepayments)
+    return calculatePTI(dispIncome, kpis).status === 'exceeds'
+  }, [mix.tracks, mix.macroForecasts, mix.prepayments, dispIncome])
+
+  if (!exceeds) return null
+  return (
+    <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] font-bold bg-red-500 text-white rounded-full leading-none">
+      !40+
+    </span>
   )
 }
 
@@ -282,14 +308,22 @@ export function Dashboard() {
         case '2': e.preventDefault(); navigate('/mix-b');      break
         case '3': e.preventDefault(); navigate('/mix-c');      break
         case '4': e.preventDefault(); navigate('/comparison'); break
-        case '5': e.preventDefault(); navigate('/costs');      break
-        case '6': e.preventDefault(); navigate('/capacity');   break
+        case '5': e.preventDefault(); navigate('/costs');        break
+        case '6': e.preventDefault(); navigate('/affordability'); break
         case '7': e.preventDefault(); navigate('/investment'); break
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [navigate])
+
+  // ── Affordability data for PTI badges ────────────────────────────────────
+  const incomeRows      = useAffordabilityStore((s) => s.incomeRows)
+  const liabilityRows   = useAffordabilityStore((s) => s.liabilityRows)
+  const totalIncome     = incomeRows.reduce((s, r) => s + r.amount, 0)
+  const totalLiabilities = liabilityRows.reduce((s, r) => s + r.monthlyPayment, 0)
+  const hasAffordabilityData = totalIncome > 0
+  const dispIncome      = totalIncome - totalLiabilities
 
   const tabCls = ({ isActive }: { isActive: boolean }) =>
     [
@@ -307,10 +341,13 @@ export function Dashboard() {
 
         {/* Tab navigation */}
         <nav className="tabs-nav flex items-stretch bg-white dark:bg-kumu-surface-dark border-b border-gray-100 dark:border-kumu-navy-light px-6 no-print overflow-x-auto">
-          {TABS.map(({ to, label, icon: Icon }) => (
+          {TABS.map(({ to, label, icon: Icon, mixId }) => (
             <NavLink key={to} to={to} className={tabCls}>
               <Icon size={15} />
               {label}
+              {hasAffordabilityData && mixId && (
+                <PTIBadge mixId={mixId} dispIncome={dispIncome} />
+              )}
             </NavLink>
           ))}
         </nav>
@@ -326,12 +363,9 @@ export function Dashboard() {
           <Route path="/costs"      element={<TransactionCostsTab />} />
           {/* Redirect old /expenses URL (from Stage 7 deploy) */}
           <Route path="/expenses"   element={<Navigate to="/costs" replace />} />
-          <Route path="/capacity"   element={
-            <PlaceholderTab
-              title="כושר החזר"
-              description="ניתוח כושר ההחזר שלכם על פי ההנחיות של בנק ישראל — בחינת ההכנסה הפנויה מול ההחזר החודשי הצפוי — בקרוב."
-            />
-          } />
+          <Route path="/affordability" element={<AffordabilityTab />} />
+          {/* Redirect old /capacity URL (Stage 7 placeholder) */}
+          <Route path="/capacity"      element={<Navigate to="/affordability" replace />} />
           <Route path="/investment" element={<InvestmentTab />} />
           <Route path="*"           element={<Navigate to="/mix-a" replace />} />
         </Routes>

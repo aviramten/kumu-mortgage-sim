@@ -24,14 +24,15 @@ function isCalculable(t: LoanTrack): boolean {
 }
 
 const ZERO_KPIS: MixKPIs = {
-  firstPayment:      0,
-  maxPayment:        0,
-  totalCost:         0,
-  totalInterest:     0,
-  totalIndexation:   0,
-  costPerShekel:     0,
-  prepaymentSavings: 0,
-  monthsSaved:       0,
+  firstPayment:         0,
+  maxPayment:           0,
+  totalCost:            0,
+  totalInterest:        0,
+  totalIndexation:      0,
+  costPerShekel:        0,
+  prepaymentSavings:    0,
+  monthsSaved:          0,
+  firstNonGracePayment: 0,
 }
 
 // ---------------------------------------------------------------------------
@@ -68,6 +69,17 @@ export function calculateMix(
 
   const firstPayment = monthTotals.get(1) ?? 0
   const maxPayment   = monthTotals.size > 0 ? Math.max(...monthTotals.values()) : 0
+
+  // ── firstNonGracePayment ──────────────────────────────────────────────────
+  // Find the first month after ALL standard grace periods (partial / full)
+  // have ended across every track. Balloon types are excluded — their entire
+  // term is their structure, not a temporary deferral.
+  const maxStandardGrace = validTracks
+    .filter((t) => t.graceType === 'partial' || t.graceType === 'full')
+    .reduce((max, t) => Math.max(max, t.graceMonths), 0)
+
+  const firstNonGraceMonth   = maxStandardGrace + 1
+  const firstNonGracePayment = monthTotals.get(firstNonGraceMonth) ?? firstPayment
 
   // ── Lifetime totals ───────────────────────────────────────────────────────
   let totalInterest   = 0
@@ -114,8 +126,9 @@ export function calculateMix(
       costPerShekel:     totalPrincipal > 0
         ? Math.round((totalCost / totalPrincipal) * 10_000) / 10_000
         : 0,
-      prepaymentSavings: Math.round(prepaymentSavings),
+      prepaymentSavings:    Math.round(prepaymentSavings),
       monthsSaved,
+      firstNonGracePayment: Math.round(firstNonGracePayment * 100) / 100,
     },
   }
 }

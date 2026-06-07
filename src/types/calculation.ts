@@ -20,6 +20,13 @@ export interface MixKPIs {
   prepaymentSavings: number
   /** Months eliminated from the longest track by prepayments (0 when no prepayments) */
   monthsSaved: number
+  /**
+   * Combined monthly payment in the first month where ALL standard grace
+   * periods (partial / full) across all tracks have ended.
+   * Equals firstPayment when no grace periods exist.
+   * Used for PTI (Payment-to-Income) calculations — PRD §3.10.
+   */
+  firstNonGracePayment: number
 }
 
 // ---------------------------------------------------------------------------
