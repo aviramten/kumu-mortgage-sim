@@ -1,7 +1,7 @@
 import type { GlobalInputs, MacroForecasts } from './macro'
 import type { LoanTrack, PrepaymentEvent, TrackResult } from './track'
 
-export type MixId = 'a' | 'b'
+export type MixId = 'a' | 'b' | 'c'
 
 export interface Mix {
   id: MixId

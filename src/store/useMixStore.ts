@@ -54,12 +54,18 @@ const createDefaultMix = (id: MixId): Mix => ({
 // ---------------------------------------------------------------------------
 // Store interface
 // ---------------------------------------------------------------------------
-type MixKey = 'mixA' | 'mixB'
-const toKey = (id: MixId): MixKey => (id === 'a' ? 'mixA' : 'mixB')
+type MixKey = 'mixA' | 'mixB' | 'mixC'
+
+const toKey = (id: MixId): MixKey => {
+  if (id === 'a') return 'mixA'
+  if (id === 'b') return 'mixB'
+  return 'mixC'
+}
 
 interface MixStore {
   mixA: Mix
   mixB: Mix
+  mixC: Mix
   // Global inputs
   updateGlobalInputs:   (id: MixId, partial: Partial<GlobalInputs>)   => void
   updateMacroForecasts: (id: MixId, partial: Partial<MacroForecasts>) => void
@@ -72,9 +78,9 @@ interface MixStore {
   addPrepayment:    (id: MixId, event: Omit<PrepaymentEvent, 'id'>) => void
   removePrepayment: (id: MixId, eventId: string) => void
   updatePrepayment: (id: MixId, eventId: string, partial: Partial<PrepaymentEvent>) => void
-  // Mix B management
-  cloneMixAtoB: () => void
-  clearMixB:    () => void
+  // Mix management — generic
+  duplicateMix: (source: MixId, target: MixId) => void
+  clearMix:     (id: MixId) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -85,6 +91,7 @@ export const useMixStore = create<MixStore>()(
     (set) => ({
   mixA: createDefaultMix('a'),
   mixB: createDefaultMix('b'),
+  mixC: createDefaultMix('c'),
 
   // ---- Global inputs ----
   updateGlobalInputs: (id, partial) =>
@@ -205,33 +212,60 @@ export const useMixStore = create<MixStore>()(
       }
     }),
 
-  // ---- Mix B management ----
-  cloneMixAtoB: () =>
-    set((state) => ({
-      mixB: {
-        ...state.mixA,
-        id:      'b' as const,
-        // Deep-clone arrays to prevent shared references
-        tracks:      state.mixA.tracks.map((t) => ({ ...t, id: crypto.randomUUID() })),
-        prepayments: state.mixA.prepayments.map((p) => ({ ...p, id: crypto.randomUUID() })),
-        globalInputs:   { ...state.mixA.globalInputs },
-        macroForecasts: { ...state.mixA.macroForecasts },
-        results: null,
-      },
-    })),
+  // ---- Generic mix management ----
+  /**
+   * duplicateMix — deep-copies source into target with fresh UUIDs for
+   * tracks and prepayments.  Also copies globalInputs and macroForecasts.
+   */
+  duplicateMix: (source, target) =>
+    set((state) => {
+      const srcKey = toKey(source)
+      const tgtKey = toKey(target)
+      const src    = state[srcKey]
 
-  clearMixB: () =>
-    set(() => ({ mixB: createDefaultMix('b') })),
+      // Build a UUID remapping so prepayment trackIds stay consistent
+      const idMap = new Map<string, string>()
+      const newTracks = src.tracks.map((t) => {
+        const newId = crypto.randomUUID()
+        idMap.set(t.id, newId)
+        return { ...t, id: newId }
+      })
+      const newPrepayments = src.prepayments.map((p) => ({
+        ...p,
+        id:      crypto.randomUUID(),
+        trackId: idMap.get(p.trackId) ?? p.trackId,
+      }))
+
+      return {
+        [tgtKey]: {
+          ...state[tgtKey],
+          id:             target,
+          globalInputs:   { ...src.globalInputs },
+          macroForecasts: { ...src.macroForecasts },
+          tracks:         newTracks,
+          prepayments:    newPrepayments,
+          results:        null,
+        },
+      }
+    }),
+
+  /** clearMix — resets a mix to its empty default state */
+  clearMix: (id) =>
+    set(() => ({ [toKey(id)]: createDefaultMix(id) })),
     }),
     {
       name: 'kumu-mix-store',
       storage: createJSONStorage(() => localStorage),
-      // Persist only data (mixA, mixB), not action functions
-      partialize: (state) => ({ mixA: state.mixA, mixB: state.mixB }),
+      // Persist only data (mixA, mixB, mixC), not action functions
+      partialize: (state) => ({ mixA: state.mixA, mixB: state.mixB, mixC: state.mixC }),
     }
   )
 )
 
 /** Convenience selector — returns the full mix object for the given id */
 export const useMix = (id: MixId) =>
-  useMixStore((s) => (id === 'a' ? s.mixA : s.mixB))
+  useMixStore((s) => {
+    if (id === 'a') return s.mixA
+    if (id === 'b') return s.mixB
+    return s.mixC
+  })

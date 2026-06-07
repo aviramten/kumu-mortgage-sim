@@ -1,5 +1,5 @@
 /**
- * ComparisonChart — dual-line chart showing monthly payment for Mix A vs Mix B.
+ * ComparisonChart — line chart showing monthly payment for up to 3 mixes.
  * Used exclusively inside ComparisonTab.
  */
 
@@ -10,7 +10,6 @@ import {
 } from 'recharts'
 import { useThemeStore } from '@/store/useThemeStore'
 import {
-  MIX_A_COLOR, MIX_B_COLOR,
   getChartTooltipStyle, getChartAxisStyle,
   CHART_GRID_COLOR_LIGHT, CHART_GRID_COLOR_DARK,
 } from '@/utils/chartTheme'
@@ -18,50 +17,64 @@ import { formatCurrencyWhole } from '@/utils/format'
 import type { MixResult } from '@/types/calculation'
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+export interface ComparisonEntry {
+  result: MixResult
+  label:  string
+  color:  string
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function buildComparisonData(resultA: MixResult, resultB: MixResult) {
-  const mapA = new Map<number, number>()
-  const mapB = new Map<number, number>()
+function buildComparisonData(entries: ComparisonEntry[]) {
+  const maps: Map<number, number>[] = entries.map(() => new Map())
 
-  for (const tr of resultA.trackResults) {
-    for (const row of tr.rows) {
-      mapA.set(row.month, (mapA.get(row.month) ?? 0) + row.totalPayment)
+  entries.forEach(({ result }, i) => {
+    for (const tr of result.trackResults) {
+      for (const row of tr.rows) {
+        maps[i].set(row.month, (maps[i].get(row.month) ?? 0) + row.totalPayment)
+      }
     }
-  }
-  for (const tr of resultB.trackResults) {
-    for (const row of tr.rows) {
-      mapB.set(row.month, (mapB.get(row.month) ?? 0) + row.totalPayment)
-    }
-  }
+  })
 
-  const allMonths = new Set([...mapA.keys(), ...mapB.keys()])
+  const allMonths = new Set<number>()
+  maps.forEach((m) => m.forEach((_, month) => allMonths.add(month)))
+
   return Array.from(allMonths)
     .sort((a, b) => a - b)
-    .map((month) => ({
-      month,
-      mixA: mapA.get(month) ?? 0,
-      mixB: mapB.get(month) ?? 0,
-    }))
+    .map((month) => {
+      const point: Record<string, number> = { month }
+      entries.forEach((_, i) => {
+        point[`mix${i}`] = maps[i].get(month) ?? 0
+      })
+      return point
+    })
 }
 
 // ---------------------------------------------------------------------------
 // Custom tooltip
 // ---------------------------------------------------------------------------
+interface TooltipPayloadItem {
+  name:  string
+  value: number
+  color: string
+}
+
 function CustomTooltip({
   active, payload, label, isDark,
 }: {
   active?: boolean
-  payload?: { name: string; value: number; color: string }[]
+  payload?: TooltipPayloadItem[]
   label?: number
   isDark: boolean
 }) {
   if (!active || !payload?.length) return null
-  const month = label ?? 0
   return (
     <div style={getChartTooltipStyle(isDark)}>
       <p className="font-semibold text-[12px] mb-1.5" style={{ color: isDark ? '#F4F7FB' : '#1A2456' }}>
-        חודש {month}
+        חודש {label ?? 0}
       </p>
       {payload.map((p) => (
         <div key={p.name} className="flex items-center gap-2 text-[12px]">
@@ -80,18 +93,14 @@ function CustomTooltip({
 // Public component
 // ---------------------------------------------------------------------------
 interface ComparisonChartProps {
-  resultA: MixResult
-  resultB: MixResult
+  entries: ComparisonEntry[]
 }
 
-export function ComparisonChart({ resultA, resultB }: ComparisonChartProps) {
+export function ComparisonChart({ entries }: ComparisonChartProps) {
   const { theme } = useThemeStore()
   const isDark    = theme === 'dark'
 
-  const chartData = useMemo(
-    () => buildComparisonData(resultA, resultB),
-    [resultA, resultB],
-  )
+  const chartData = useMemo(() => buildComparisonData(entries), [entries])
 
   const axisStyle = getChartAxisStyle(isDark)
   const gridColor = isDark ? CHART_GRID_COLOR_DARK : CHART_GRID_COLOR_LIGHT
@@ -122,7 +131,7 @@ export function ComparisonChart({ resultA, resultB }: ComparisonChartProps) {
           content={(props) => (
             <CustomTooltip
               active={props.active}
-              payload={props.payload as unknown as { name: string; value: number; color: string }[]}
+              payload={props.payload as unknown as TooltipPayloadItem[]}
               label={props.label as number}
               isDark={isDark}
             />
@@ -137,25 +146,18 @@ export function ComparisonChart({ resultA, resultB }: ComparisonChartProps) {
           )}
         />
 
-        <Line
-          type="monotone"
-          dataKey="mixA"
-          name="תמהיל א'"
-          stroke={MIX_A_COLOR}
-          strokeWidth={2.5}
-          dot={false}
-          activeDot={{ r: 4, strokeWidth: 0 }}
-        />
-
-        <Line
-          type="monotone"
-          dataKey="mixB"
-          name="תמהיל ב'"
-          stroke={MIX_B_COLOR}
-          strokeWidth={2.5}
-          dot={false}
-          activeDot={{ r: 4, strokeWidth: 0 }}
-        />
+        {entries.map((entry, i) => (
+          <Line
+            key={entry.label}
+            type="monotone"
+            dataKey={`mix${i}`}
+            name={entry.label}
+            stroke={entry.color}
+            strokeWidth={2.5}
+            dot={false}
+            activeDot={{ r: 4, strokeWidth: 0 }}
+          />
+        ))}
       </LineChart>
     </ResponsiveContainer>
   )

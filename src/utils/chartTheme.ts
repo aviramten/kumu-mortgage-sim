@@ -36,6 +36,7 @@ export const KUMU_KPI_COLORS = {
 // Mix comparison palette
 export const MIX_A_COLOR = '#3B5BDB' // kumu-blue
 export const MIX_B_COLOR = '#E87A5D' // kumu-coral
+export const MIX_C_COLOR = '#5BB572' // kumu-green
 
 // ---------------------------------------------------------------------------
 // Shared Recharts style helpers (functions so they react to dark-mode toggle)
