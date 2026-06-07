@@ -16,6 +16,7 @@ import { DistributionDonut } from '@/components/outputs/charts/DistributionDonut
 import { PaymentLineChart } from '@/components/outputs/charts/PaymentLineChart'
 import { CostBreakdownBars } from '@/components/outputs/charts/CostBreakdownBars'
 import { AmortizationTable } from '@/components/outputs/AmortizationTable'
+import { BalanceLineChart } from '@/components/outputs/charts/BalanceLineChart'
 import { InvestmentTab } from '@/components/investment/InvestmentTab'
 import { TransactionCostsTab } from '@/components/costs/TransactionCostsTab'
 import { AffordabilityTab } from '@/components/affordability/AffordabilityTab'
@@ -186,6 +187,7 @@ function MixTabContent({ mixId }: { mixId: MixId }) {
         <PaymentLineChart  mixId={mixId} />
       </div>
       <CostBreakdownBars mixId={mixId} />
+      <BalanceLineChart  mixId={mixId} />
       <AmortizationTable mixId={mixId} />
 
     </div>

@@ -1,26 +1,26 @@
 /**
- * AffordabilityTab — PTI (Payment-to-Income) calculator.
+ * AffordabilityTab — income/liability input + simple PTI notification per mix.
  *
  * Layout (RTL):
  *   Row 1 — two columns: IncomeSection (right) | LiabilitiesSection (left)
- *   Row 2 — full-width PTI results card
+ *   Row 2 — full-width PTI summary card (one row per mix, warning when > 40%)
  *
- * Reads income / liability data from useAffordabilityStore.
- * Computes PTI against Mix A via calculateMix + calculatePTI.
- * PRD §3.10 + §שלב 9
+ * Liabilities with remainingMonths 1–17 are excluded from totalLiabilityPayments
+ * (handled in the store — Bank of Israel practice for near-expiry obligations).
  */
 
 import { useMemo, useState } from 'react'
-import { Plus, X, ShieldCheck } from 'lucide-react'
+import { Plus, X, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useAffordabilityStore } from '@/store/useAffordabilityStore'
 import { useMix } from '@/store/useMixStore'
 import { calculateMix } from '@/engine/calculateMix'
 import { calculatePTI } from '@/engine/pti'
 import { formatNumber } from '@/utils/format'
 import type { IncomeRow, LiabilityRow } from '@/types/affordability'
+import type { MixId } from '@/types/mix'
 
 // ---------------------------------------------------------------------------
-// Shared numeric input (same pattern as TransactionCostsTab AmountInput)
+// Shared numeric input
 // ---------------------------------------------------------------------------
 function NumericInput({
   value,
@@ -82,12 +82,11 @@ function LabelInput({ value, onChange }: { value: string; onChange: (v: string) 
 }
 
 // ---------------------------------------------------------------------------
-// Card shell (consistent section wrapper)
+// Section card shell
 // ---------------------------------------------------------------------------
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark shadow-sm overflow-hidden">
-      {/* Card header */}
       <div className="px-4 py-3 bg-gray-50 dark:bg-kumu-navy-dark/50 border-b border-gray-100 dark:border-kumu-navy-light">
         <span className="text-sm font-semibold text-kumu-navy dark:text-white">{title}</span>
       </div>
@@ -115,7 +114,6 @@ function IncomeSection() {
 
   return (
     <SectionCard title='הכנסות חודשיות'>
-      {/* Column header */}
       <div
         className="grid items-center gap-3 px-4 py-1.5 border-b border-gray-50 dark:border-kumu-navy/50"
         style={{ gridTemplateColumns: '1fr 130px 28px' }}
@@ -129,7 +127,6 @@ function IncomeSection() {
         <span />
       </div>
 
-      {/* Rows */}
       {incomeRows.map((row: IncomeRow, idx) => (
         <div key={row.id}>
           {hasCustomRows && idx === lastFixedIdx + 1 && (
@@ -144,16 +141,10 @@ function IncomeSection() {
                 {row.isFixed ? (
                   <span className="text-kumu-navy dark:text-white">{row.label}</span>
                 ) : (
-                  <LabelInput
-                    value={row.label}
-                    onChange={(v) => updateIncomeLabel(row.id, v)}
-                  />
+                  <LabelInput value={row.label} onChange={(v) => updateIncomeLabel(row.id, v)} />
                 )}
               </div>
-              <NumericInput
-                value={row.amount}
-                onChange={(v) => updateIncomeAmount(row.id, v)}
-              />
+              <NumericInput value={row.amount} onChange={(v) => updateIncomeAmount(row.id, v)} />
               <div className="flex justify-center">
                 {!row.isFixed && (
                   <button
@@ -171,7 +162,6 @@ function IncomeSection() {
         </div>
       ))}
 
-      {/* Add row button */}
       <div className="px-4 py-2.5 border-t border-gray-100 dark:border-kumu-navy-light">
         <button
           type="button"
@@ -183,7 +173,6 @@ function IncomeSection() {
         </button>
       </div>
 
-      {/* Total row */}
       <div
         className="grid items-center gap-3 px-4 py-3 bg-kumu-bg-light dark:bg-kumu-navy rounded-b-xl border-t-2 border-gray-100 dark:border-kumu-navy-light"
         style={{ gridTemplateColumns: '1fr 130px 28px' }}
@@ -219,7 +208,6 @@ function LiabilitiesSection() {
 
   return (
     <SectionCard title='התחייבויות קיימות'>
-      {/* Column header */}
       <div
         className="grid items-center gap-2 px-4 py-1.5 border-b border-gray-50 dark:border-kumu-navy/50"
         style={{ gridTemplateColumns: '1fr 90px 90px 72px 28px' }}
@@ -239,67 +227,50 @@ function LiabilitiesSection() {
         <span />
       </div>
 
-      {/* Rows */}
-      {liabilityRows.map((row: LiabilityRow, idx) => (
-        <div key={row.id}>
-          {hasCustomRows && idx === lastFixedIdx + 1 && (
-            <div className="mx-4 my-0.5 border-t-2 border-dashed border-gray-200 dark:border-kumu-navy-light/60" />
-          )}
-          <div className="border-b border-gray-50 dark:border-kumu-navy/50 last:border-0">
-            <div
-              className="grid items-center gap-2 px-4 py-2 group"
-              style={{ gridTemplateColumns: '1fr 90px 90px 72px 28px' }}
-            >
-              {/* Label */}
-              <div className="text-sm text-right">
-                {row.isFixed ? (
-                  <span className="text-kumu-navy dark:text-white">{row.label}</span>
-                ) : (
-                  <LabelInput
-                    value={row.label}
-                    onChange={(v) => updateLiabilityLabel(row.id, v)}
-                  />
-                )}
-              </div>
-
-              {/* Monthly payment */}
-              <NumericInput
-                value={row.monthlyPayment}
-                onChange={(v) => updateLiability(row.id, 'monthlyPayment', v)}
-              />
-
-              {/* Balance */}
-              <NumericInput
-                value={row.balance}
-                onChange={(v) => updateLiability(row.id, 'balance', v)}
-              />
-
-              {/* Remaining months */}
-              <NumericInput
-                value={row.remainingMonths}
-                onChange={(v) => updateLiability(row.id, 'remainingMonths', v)}
-                placeholder="0"
-              />
-
-              {/* Delete */}
-              <div className="flex justify-center">
-                {!row.isFixed && (
-                  <button
-                    type="button"
-                    onClick={() => removeLiabilityRow(row.id)}
-                    title="מחק שורה"
-                    className="p-1 rounded text-gray-300 dark:text-kumu-navy-light/40 hover:text-kumu-coral hover:bg-kumu-coral/10 transition-colors"
-                  >
-                    <X size={13} />
-                  </button>
-                )}
+      {liabilityRows.map((row: LiabilityRow, idx) => {
+        const isShortTerm = row.remainingMonths >= 1 && row.remainingMonths < 18
+        return (
+          <div key={row.id}>
+            {hasCustomRows && idx === lastFixedIdx + 1 && (
+              <div className="mx-4 my-0.5 border-t-2 border-dashed border-gray-200 dark:border-kumu-navy-light/60" />
+            )}
+            <div className="border-b border-gray-50 dark:border-kumu-navy/50 last:border-0">
+              <div
+                className={[
+                  'grid items-center gap-2 px-4 py-2 group',
+                  isShortTerm ? 'opacity-50' : '',
+                ].join(' ')}
+                style={{ gridTemplateColumns: '1fr 90px 90px 72px 28px' }}
+                title={isShortTerm ? 'פחות מ-18 חודשים — לא נכלל בחישוב' : undefined}
+              >
+                <div className="text-sm text-right">
+                  {row.isFixed ? (
+                    <span className="text-kumu-navy dark:text-white">{row.label}</span>
+                  ) : (
+                    <LabelInput value={row.label} onChange={(v) => updateLiabilityLabel(row.id, v)} />
+                  )}
+                </div>
+                <NumericInput value={row.monthlyPayment} onChange={(v) => updateLiability(row.id, 'monthlyPayment', v)} />
+                <NumericInput value={row.balance} onChange={(v) => updateLiability(row.id, 'balance', v)} />
+                <NumericInput value={row.remainingMonths} onChange={(v) => updateLiability(row.id, 'remainingMonths', v)} />
+                <div className="flex justify-center">
+                  {!row.isFixed && (
+                    <button
+                      type="button"
+                      onClick={() => removeLiabilityRow(row.id)}
+                      title="מחק שורה"
+                      className="p-1 rounded text-gray-300 dark:text-kumu-navy-light/40 hover:text-kumu-coral hover:bg-kumu-coral/10 transition-colors"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
 
-      {/* Add row button */}
       <div className="px-4 py-2.5 border-t border-gray-100 dark:border-kumu-navy-light">
         <button
           type="button"
@@ -311,7 +282,6 @@ function LiabilitiesSection() {
         </button>
       </div>
 
-      {/* Total row */}
       <div
         className="grid items-center gap-2 px-4 py-3 bg-kumu-bg-light dark:bg-kumu-navy rounded-b-xl border-t-2 border-gray-100 dark:border-kumu-navy-light"
         style={{ gridTemplateColumns: '1fr 90px 90px 72px 28px' }}
@@ -329,152 +299,162 @@ function LiabilitiesSection() {
 }
 
 // ---------------------------------------------------------------------------
-// KPI box — one of the four summary boxes in the PTI results card
+// PTI summary — one row per mix, warning only when exceeds 40%
 // ---------------------------------------------------------------------------
-function KPIBox({
-  label,
-  value,
-  highlight,
-}: {
-  label: string
-  value: number
-  highlight?: 'green' | 'coral' | 'default'
-}) {
-  const valueColor =
-    highlight === 'green'
-      ? 'text-kumu-green'
-      : highlight === 'coral'
-        ? 'text-kumu-coral'
-        : 'text-kumu-navy dark:text-white'
+const MIX_DEFS: { id: MixId; label: string }[] = [
+  { id: 'a', label: "תמהיל א'" },
+  { id: 'b', label: "תמהיל ב'" },
+  { id: 'c', label: "תמהיל ג'" },
+]
 
-  return (
-    <div className="flex flex-col items-end gap-1 bg-gray-50 dark:bg-kumu-navy/50 rounded-xl px-4 py-3 border border-gray-100 dark:border-kumu-navy-light">
-      <span className="text-[11px] text-kumu-navy-light dark:text-kumu-blue-lighter font-medium">
-        {label}
-      </span>
-      <span className={`text-xl font-bold tabular-nums ${valueColor}`} dir="ltr">
-        {value === 0 ? '—' : `₪${formatNumber(Math.round(value))}`}
-      </span>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// PTI results card (full-width, below the two columns)
-// ---------------------------------------------------------------------------
-function PTIResultsCard() {
-  const {
-    totalIncome,
-    totalLiabilityPayments,
-    disposableIncome,
-  } = useAffordabilityStore()
+function PTISummaryCard() {
+  const { totalIncome, totalLiabilityPayments, disposableIncome } = useAffordabilityStore()
 
   const mixA = useMix('a')
+  const mixB = useMix('b')
+  const mixC = useMix('c')
 
-  const ptiResult = useMemo(() => {
-    const dispIncome = disposableIncome()
-    const { kpis }   = calculateMix(mixA.tracks, mixA.macroForecasts, mixA.prepayments)
-    return calculatePTI(dispIncome, kpis)
-  }, [
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    mixA.tracks,
-    mixA.macroForecasts,
-    mixA.prepayments,
-    // disposableIncome is a getter — depend on its inputs instead
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    totalIncome(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    totalLiabilityPayments(),
-  ])
-
-  const { ptiRatio, status, label, relevantPayment } = ptiResult
   const income      = totalIncome()
   const liabilities = totalLiabilityPayments()
   const dispIncome  = disposableIncome()
+  const threshold   = Math.round(dispIncome * 0.4)
 
-  // Progress bar fill: cap at 100%, show at least a sliver so the bar isn't invisible
-  const barWidth = income === 0 ? 0 : Math.min(ptiRatio, 100)
+  const mixes = [
+    { ...MIX_DEFS[0], mix: mixA },
+    { ...MIX_DEFS[1], mix: mixB },
+    { ...MIX_DEFS[2], mix: mixC },
+  ]
 
-  // Colour tokens by status
-  const barColor =
-    status === 'ok'      ? 'bg-kumu-green' :
-    status === 'warning' ? 'bg-yellow-400' :
-    'bg-red-500'
+  const ptiResults = useMemo(
+    () =>
+      mixes.map(({ id, label, mix }) => {
+        if (mix.tracks.length === 0) return { id, label, pti: null }
+        const { kpis } = calculateMix(mix.tracks, mix.macroForecasts, mix.prepayments)
+        return { id, label, pti: calculatePTI(dispIncome, kpis) }
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      mixA.tracks, mixA.macroForecasts, mixA.prepayments,
+      mixB.tracks, mixB.macroForecasts, mixB.prepayments,
+      mixC.tracks, mixC.macroForecasts, mixC.prepayments,
+      dispIncome,
+    ],
+  )
 
-  const statusTextColor =
-    status === 'ok'      ? 'text-kumu-green' :
-    status === 'warning' ? 'text-yellow-500 dark:text-yellow-400' :
-    'text-red-500'
+  const anyExceeds = ptiResults.some((r) => r.pti?.status === 'exceeds')
 
   return (
     <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark shadow-sm overflow-hidden">
-      {/* Card header */}
-      <div className="px-5 py-3 bg-gray-50 dark:bg-kumu-navy-dark/50 border-b border-gray-100 dark:border-kumu-navy-light flex items-center justify-between">
+      <div className="px-5 py-3 bg-gray-50 dark:bg-kumu-navy-dark/50 border-b border-gray-100 dark:border-kumu-navy-light flex items-center gap-2">
+        <ShieldCheck size={15} className="text-kumu-blue" />
         <span className="text-sm font-semibold text-kumu-navy dark:text-white">
-          יחס ההחזר (PTI) — לפי תמהיל א'
+          בדיקת כושר החזר (PTI)
         </span>
-        {income > 0 && (
-          <span
-            className={`text-sm font-bold tabular-nums ${statusTextColor}`}
-          >
-            {ptiRatio.toFixed(1)}%
-          </span>
-        )}
       </div>
 
-      <div className="p-5 flex flex-col gap-5">
-
-        {/* 4 KPI boxes */}
-        <div className="grid grid-cols-4 gap-3">
-          <KPIBox label='סה"כ הכנסות'       value={income}         />
-          <KPIBox label='סה"כ התחייבויות'   value={liabilities}    highlight={liabilities > 0 ? 'coral' : 'default'} />
-          <KPIBox label='הכנסה פנויה'        value={dispIncome}     highlight={dispIncome > 0 ? 'green' : dispIncome < 0 ? 'coral' : 'default'} />
-          <KPIBox label='החזר חודשי משוער'   value={relevantPayment} />
-        </div>
-
-        {/* Progress bar */}
-        <div>
-          {/* Label above bar */}
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs text-kumu-navy-light dark:text-kumu-blue-lighter">
-              מגבלת בנק ישראל: 40%
-            </span>
-            <span className="text-sm font-semibold text-kumu-navy dark:text-white">
-              {income === 0 ? 'יחס ההחזר: —' : `יחס ההחזר: ${ptiRatio.toFixed(1)}%`}
-            </span>
-          </div>
-
-          {/* Bar track */}
-          <div className="relative w-full bg-gray-200 dark:bg-kumu-navy rounded-full h-4">
-            {/* Fill */}
-            <div
-              className={`h-4 rounded-full transition-all duration-300 ${barColor}`}
-              style={{ width: `${barWidth}%` }}
-            />
-            {/* 40% marker line */}
-            <div
-              className="absolute top-0 bottom-0 w-px bg-kumu-navy/30 dark:bg-white/30"
-              style={{ left: '40%' }}
-            />
-          </div>
-
-          {/* 40% tick label */}
-          <div className="relative mt-1" style={{ height: '16px' }}>
-            <span
-              className="absolute text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter transform -translate-x-1/2"
-              style={{ left: '40%' }}
-            >
-              40%
-            </span>
-          </div>
-        </div>
-
-        {/* KUMU-tone label */}
-        <p className={`text-sm leading-relaxed font-medium ${statusTextColor}`}>
-          {label}
+      {income === 0 ? (
+        <p className="px-5 py-5 text-sm text-kumu-navy-light dark:text-kumu-blue-lighter">
+          הזינו נתוני הכנסות כדי לבדוק את יחס ההחזר לכל תמהיל.
         </p>
+      ) : (
+        <div className="p-5 flex flex-col gap-4">
 
-      </div>
+          {/* Income context line */}
+          <div className="flex items-center gap-6 text-sm flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <span className="text-kumu-navy-light dark:text-kumu-blue-lighter">הכנסה פנויה:</span>
+              <span className="font-semibold tabular-nums text-kumu-navy dark:text-white" dir="ltr">
+                ₪{formatNumber(Math.round(dispIncome))}
+              </span>
+              {liabilities > 0 && (
+                <span className="text-kumu-navy-light dark:text-kumu-blue-lighter text-xs">
+                  ({formatNumber(Math.round(income))} הכנסות − {formatNumber(Math.round(liabilities))} התחייבויות)
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-kumu-navy-light dark:text-kumu-blue-lighter">רף 40%:</span>
+              <span className="font-semibold tabular-nums text-kumu-navy dark:text-white" dir="ltr">
+                ₪{formatNumber(threshold)}
+              </span>
+            </div>
+          </div>
+
+          {/* Per-mix rows */}
+          <div className="flex flex-col gap-2">
+            {ptiResults.map(({ id, label, pti }) => {
+              if (pti === null) {
+                return (
+                  <div
+                    key={id}
+                    className="flex items-center justify-between px-4 py-2.5 rounded-lg bg-gray-50 dark:bg-kumu-navy/40"
+                  >
+                    <span className="text-sm font-medium text-kumu-navy dark:text-white">{label}</span>
+                    <span className="text-xs text-kumu-navy-light dark:text-kumu-blue-lighter">לא מוגדר</span>
+                  </div>
+                )
+              }
+
+              const isExceeds = pti.status === 'exceeds'
+              const isWarning = pti.status === 'warning'
+
+              return (
+                <div
+                  key={id}
+                  className={[
+                    'flex items-center justify-between px-4 py-2.5 rounded-lg',
+                    isExceeds
+                      ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20'
+                      : isWarning
+                        ? 'bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20'
+                        : 'bg-green-50 dark:bg-kumu-green/10 border border-green-200 dark:border-kumu-green/20',
+                  ].join(' ')}
+                >
+                  <div className="flex items-center gap-2.5">
+                    {isExceeds ? (
+                      <AlertCircle size={15} className="text-red-500 shrink-0" />
+                    ) : (
+                      <CheckCircle2 size={15} className={isWarning ? 'text-yellow-500' : 'text-kumu-green'} />
+                    )}
+                    <span className="text-sm font-medium text-kumu-navy dark:text-white">{label}</span>
+                  </div>
+
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="tabular-nums text-kumu-navy-light dark:text-kumu-blue-lighter" dir="ltr">
+                      ₪{formatNumber(Math.round(pti.relevantPayment))}
+                    </span>
+                    <span
+                      className={[
+                        'font-bold tabular-nums w-14 text-left',
+                        isExceeds ? 'text-red-500' :
+                        isWarning ? 'text-yellow-600 dark:text-yellow-400' :
+                        'text-kumu-green',
+                      ].join(' ')}
+                      dir="ltr"
+                    >
+                      {pti.ptiRatio.toFixed(1)}%
+                    </span>
+                    {isExceeds && (
+                      <span className="text-xs text-red-500 font-medium">חורג מ-40%</span>
+                    )}
+                    {isWarning && (
+                      <span className="text-xs text-yellow-600 dark:text-yellow-400 font-medium">קרוב ל-40%</span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Summary warning when any mix exceeds */}
+          {anyExceeds && (
+            <div className="rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 px-4 py-3 text-sm text-red-700 dark:text-red-400 leading-relaxed">
+              אחד או יותר מהתמהילים חורג מ-40% מההכנסה הפנויה — בנקים רבים יתקשו לאשר משכנתא בתנאים אלה. שווה לבחון הפחתה בסכום המשכנתא או הארכת תקופה.
+            </div>
+          )}
+
+        </div>
+      )}
     </div>
   )
 }
@@ -486,7 +466,7 @@ export function AffordabilityTab() {
   return (
     <div className="flex-1 p-6 overflow-y-auto">
 
-      {/* ── Page header ───────────────────────────────────────────────────── */}
+      {/* Page header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
           <div className="w-9 h-9 rounded-xl bg-kumu-blue/10 dark:bg-kumu-blue/20 flex items-center justify-center">
@@ -501,15 +481,15 @@ export function AffordabilityTab() {
         </p>
       </div>
 
-      {/* ── Two-column grid: income (right) + liabilities (left) in RTL ───── */}
+      {/* Two-column: income (right) + liabilities (left) in RTL */}
       <div className="grid grid-cols-2 gap-5 items-start">
         <IncomeSection />
         <LiabilitiesSection />
       </div>
 
-      {/* ── PTI results (full width, below) ───────────────────────────────── */}
+      {/* PTI summary — full width, below */}
       <div className="mt-5">
-        <PTIResultsCard />
+        <PTISummaryCard />
       </div>
 
     </div>

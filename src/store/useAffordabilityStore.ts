@@ -117,7 +117,12 @@ export const useAffordabilityStore = create<AffordabilityStore>()(
         get().incomeRows.reduce((sum, r) => sum + (r.amount || 0), 0),
 
       totalLiabilityPayments: () =>
-        get().liabilityRows.reduce((sum, r) => sum + (r.monthlyPayment || 0), 0),
+        get().liabilityRows.reduce((sum, r) => {
+          // Exclude loans with < 18 remaining months — about to end, don't penalise PTI.
+          // remainingMonths === 0 means "not specified" → include (safe default).
+          if (r.remainingMonths >= 1 && r.remainingMonths < 18) return sum
+          return sum + (r.monthlyPayment || 0)
+        }, 0),
 
       disposableIncome: () => {
         const g = get()
