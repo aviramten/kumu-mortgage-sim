@@ -49,28 +49,6 @@ const TABS = [
 ] as const
 
 // ---------------------------------------------------------------------------
-// Placeholder tab — for sections not yet implemented
-// ---------------------------------------------------------------------------
-function PlaceholderTab({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-5 py-20 px-8 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-kumu-navy flex items-center justify-center">
-        <BarChart3 size={24} className="text-kumu-navy-light dark:text-kumu-blue-lighter" />
-      </div>
-      <div>
-        <h2 className="text-base font-semibold text-kumu-navy dark:text-white mb-2">{title}</h2>
-        <p className="text-sm text-kumu-navy-light dark:text-kumu-blue-lighter max-w-sm leading-relaxed">
-          {description}
-        </p>
-      </div>
-      <span className="text-xs text-kumu-blue dark:text-kumu-blue-lighter bg-kumu-blue/10 dark:bg-kumu-blue/20 px-3 py-1 rounded-full font-medium">
-        בקרוב
-      </span>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // PTI badge — shows "!40+" on a mix tab when that mix exceeds the 40% limit
 // Visible only when affordability data has been entered (totalIncome > 0).
 // ---------------------------------------------------------------------------
