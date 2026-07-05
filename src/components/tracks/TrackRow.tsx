@@ -124,6 +124,7 @@ function AmountCell({ value, onChange, hasError }: {
       type="text"
       inputMode="numeric"
       dir="ltr"
+      data-testid="track-amount"
       value={focused ? raw : formatNumber(Math.round(value))}
       onFocus={() => { setFocused(true); setRaw(String(Math.round(value))) }}
       onBlur={() => {
@@ -149,6 +150,7 @@ function MonthsCell({ value, onChange, hasError }: {
       type="text"
       inputMode="numeric"
       dir="ltr"
+      data-testid="track-months"
       value={focused ? raw : String(value)}
       onFocus={() => { setFocused(true); setRaw(String(value)) }}
       onBlur={() => {
@@ -283,7 +285,7 @@ export function TrackRow({
   ].join(' ')
 
   return (
-    <tr className={rowCls}>
+    <tr className={rowCls} data-testid="track-row">
 
       {/* 1 ── מספר */}
       <td className={`${TD} text-center w-7`}>
@@ -349,6 +351,7 @@ export function TrackRow({
       <td className={`${TD} w-[56px]`}>
         <input
           type="number" value={track.annualRate} min={0} max={30} step={0.05} dir="ltr"
+          data-testid="track-rate"
           onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd({ annualRate: v }) }}
           className={[I, rateErr ? ERR : ''].join(' ')}
         />

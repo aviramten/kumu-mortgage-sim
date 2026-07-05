@@ -24,9 +24,10 @@ interface NumberInputProps {
   onChange:    (n: number) => void
   placeholder?: string
   hasError?:   boolean
+  testId?:     string
 }
 
-function NumberInput({ value, onChange, placeholder, hasError = false }: NumberInputProps) {
+function NumberInput({ value, onChange, placeholder, hasError = false, testId }: NumberInputProps) {
   const [focused, setFocused] = useState(false)
   const [raw, setRaw]         = useState('')
 
@@ -56,6 +57,7 @@ function NumberInput({ value, onChange, placeholder, hasError = false }: NumberI
         type="text"
         inputMode="numeric"
         dir="ltr"
+        data-testid={testId}
         value={focused ? raw : formatNumber(Math.round(value))}
         onFocus={handleFocus}
         onBlur={handleBlur}
@@ -154,6 +156,7 @@ export function GlobalInputs({ mixId }: GlobalInputsProps) {
           value={propertyValue}
           onChange={setProperty}
           placeholder="2,000,000"
+          testId="property-value"
         />
       </ValidationField>
 
@@ -163,6 +166,7 @@ export function GlobalInputs({ mixId }: GlobalInputsProps) {
           value={equity}
           onChange={setEquity}
           placeholder="600,000"
+          testId="equity"
         />
       </ValidationField>
 

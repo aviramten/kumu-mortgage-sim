@@ -1,0 +1,14 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:5173",
+      "localStorage": [
+        {
+          "name": "kumu-auth",
+          "value": "{\"state\":{\"isAuthenticated\":true,\"userEmail\":\"admin@mortgage.co.il\"},\"version\":0}"
+        }
+      ]
+    }
+  ]
+}
