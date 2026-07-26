@@ -32,10 +32,10 @@ import {
 // Default investment inputs
 // ---------------------------------------------------------------------------
 const DEFAULT_INPUTS: InvestmentInputs = {
-  initialCapital:  200_000,
-  monthlyDeposit:  2_000,
+  initialCapital:  0,
+  monthlyDeposit:  0,
   years:           20,
-  annualReturn:    DEFAULT_EXPECTED_RETURN,
+  annualReturn:    0,
   capitalGainsTax: DEFAULT_CAPITAL_GAINS_TAX,
 }
 
@@ -43,7 +43,7 @@ const DEFAULT_INPUTS: InvestmentInputs = {
 // Labelled number input
 // ---------------------------------------------------------------------------
 function InputRow({
-  label, value, onChange, min, max, step, suffix,
+  label, value, onChange, min, max, suffix,
 }: {
   label: string
   value: number
@@ -53,6 +53,9 @@ function InputRow({
   step?: number
   suffix?: string
 }) {
+  const [focused, setFocused] = useState(false)
+  const [raw, setRaw]         = useState('')
+
   return (
     <div className="flex flex-col gap-1">
       <label className="text-[10px] font-semibold uppercase tracking-widest text-kumu-navy-light dark:text-kumu-blue-lighter">
@@ -60,13 +63,22 @@ function InputRow({
       </label>
       <div className="flex items-center gap-1.5">
         <input
-          type="number"
-          min={min}
-          max={max}
-          step={step ?? 1}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="flex-1 text-sm rounded-lg border border-gray-200 dark:border-kumu-navy-light bg-transparent text-kumu-navy dark:text-white px-3 py-2 outline-none focus:border-kumu-blue transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          type="text"
+          inputMode="decimal"
+          placeholder="0"
+          value={focused ? raw : (value === 0 ? '' : String(value))}
+          onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
+          onBlur={() => {
+            setFocused(false)
+            const n = parseFloat(raw)
+            if (isNaN(n)) { onChange(0); return }
+            const clamped = (min !== undefined && n < min) ? min
+              : (max !== undefined && n > max) ? max
+              : n
+            onChange(clamped)
+          }}
+          onChange={(e) => setRaw(e.target.value)}
+          className="flex-1 text-sm rounded-lg border border-gray-200 dark:border-kumu-navy-light bg-transparent text-kumu-navy dark:text-white px-3 py-2 outline-none focus:border-kumu-blue transition-colors"
         />
         {suffix && (
           <span className="text-xs text-kumu-navy-light dark:text-kumu-blue-lighter w-6 text-center shrink-0">
@@ -287,7 +299,8 @@ export function InvestmentTab() {
   const gridColor = isDark ? CHART_GRID_COLOR_DARK : CHART_GRID_COLOR_LIGHT
 
   // Comparison summary
-  const netDiff = investResult.netProfit - comparisonAmount
+  // Compare total net portfolio value (principal + returns after tax) vs mortgage interest saved
+  const netDiff = investResult.netValue - comparisonAmount
   const hasComparison = comparisonAmount > 0
   const CompIcon = netDiff > 0 ? TrendingUp : netDiff < 0 ? TrendingDown : Minus
   const compAccent = netDiff > 0 ? 'text-kumu-green' : netDiff < 0 ? 'text-kumu-coral' : 'text-kumu-blue'
@@ -507,9 +520,9 @@ export function InvestmentTab() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter mb-0.5">רווח השקעה נטו</p>
+                  <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter mb-0.5">יתרת תיק נטו</p>
                   <p className="text-sm font-semibold tabular-nums text-kumu-green">
-                    {formatCurrencyWhole(Math.max(0, investResult.netProfit))}
+                    {formatCurrencyWhole(investResult.netValue)}
                   </p>
                 </div>
                 <div>
