@@ -98,9 +98,12 @@ function LTVBadge({ ltv, limit }: { ltv: number; limit: number }) {
 // ---------------------------------------------------------------------------
 function TransactionInputs() {
   const tx = useTransactionStore()
+  const totalCosts = useCostsStore((s) => s.totalCosts)
   const [isManual, setIsManual] = useState(false)
 
   const { propertyValue, equity, purchaseStatus, mortgageAmount, update } = tx
+  const costs     = totalCosts()
+  const netEquity = equity - costs
   const ltv      = propertyValue > 0 ? (mortgageAmount / propertyValue) * 100 : 0
   const maxLTV   = MAX_LTV[purchaseStatus]
   const ltvResult = validateLTV(ltv, purchaseStatus)
@@ -128,12 +131,43 @@ function TransactionInputs() {
         </div>
       </div>
 
-      {/* Equity */}
+      {/* Equity — total */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-kumu-navy dark:text-kumu-blue-lighter">הון עצמי</span>
+        <span className="text-xs font-medium text-kumu-navy dark:text-kumu-blue-lighter">הון עצמי כולל</span>
         <div className="rounded-xl border border-gray-200 dark:border-kumu-navy-light bg-gray-50 dark:bg-kumu-navy/30">
           <NumberInput value={equity} onChange={setEquity} placeholder="600,000" testId="tx-equity" />
         </div>
+      </div>
+
+      {/* Net equity — read-only derived field */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-kumu-navy dark:text-kumu-blue-lighter">
+          הון עצמי נטו לאחר ניכוי הוצאות נלוות
+        </span>
+        <div className={[
+          'flex items-center h-9 rounded-xl border px-3',
+          netEquity < 0
+            ? 'border-kumu-error/50 bg-red-50 dark:bg-red-900/10'
+            : 'border-gray-200 dark:border-kumu-navy-light bg-gray-100 dark:bg-kumu-navy/50',
+        ].join(' ')}>
+          <span className="text-sm text-kumu-navy-light dark:text-kumu-blue-lighter ml-1 select-none">₪</span>
+          <span dir="ltr" className={[
+            'flex-1 text-sm font-medium tabular-nums',
+            netEquity < 0 ? 'text-kumu-error' : 'text-kumu-navy dark:text-white',
+          ].join(' ')}>
+            {costs === 0 ? '—' : formatNumber(netEquity)}
+          </span>
+          {costs > 0 && (
+            <span className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter/70">
+              ניכוי ₪{formatNumber(costs)}
+            </span>
+          )}
+        </div>
+        {netEquity < 0 && costs > 0 && (
+          <p className="text-xs text-kumu-error leading-snug">
+            ההוצאות הנלוות עולות על ההון העצמי
+          </p>
+        )}
       </div>
 
       {/* Purchase status */}
