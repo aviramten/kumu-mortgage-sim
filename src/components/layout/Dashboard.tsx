@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import {
   BarChart3, TrendingUp, LayoutList, Copy, GitCompare,
-  Receipt, ShieldCheck, ChevronDown,
+  ShieldCheck, ChevronDown, FileText, Trash2,
 } from 'lucide-react'
 import { Header } from './Header'
 import { Footer } from './Footer'
@@ -18,12 +18,15 @@ import { CostBreakdownBars } from '@/components/outputs/charts/CostBreakdownBars
 import { AmortizationTable } from '@/components/outputs/AmortizationTable'
 import { BalanceLineChart } from '@/components/outputs/charts/BalanceLineChart'
 import { InvestmentTab } from '@/components/investment/InvestmentTab'
-import { TransactionCostsTab } from '@/components/costs/TransactionCostsTab'
 import { AffordabilityTab } from '@/components/affordability/AffordabilityTab'
+import { TransactionTab } from '@/components/transaction/TransactionTab'
 import { useMix, useMixStore } from '@/store/useMixStore'
 import { useAffordabilityStore } from '@/store/useAffordabilityStore'
+import { useTransactionStore } from '@/store/useTransactionStore'
+import { useToastStore } from '@/store/useToastStore'
 import { calculateMix } from '@/engine/calculateMix'
 import { calculatePTI } from '@/engine/pti'
+import { MAX_LTV } from '@/utils/validation'
 import type { MixId } from '@/types/mix'
 
 // ---------------------------------------------------------------------------
@@ -37,21 +40,19 @@ const MIX_LABELS: Record<MixId, string> = {
 
 // ---------------------------------------------------------------------------
 // Tab configuration — order = right-to-left in RTL layout
-// mixId is set for mix tabs so we can attach PTI badges to them
 // ---------------------------------------------------------------------------
 const TABS = [
-  { to: '/mix-a',        label: "תמהיל א'",     icon: LayoutList,  mixId: 'a' as MixId },
-  { to: '/mix-b',        label: "תמהיל ב'",     icon: BarChart3,   mixId: 'b' as MixId },
-  { to: '/mix-c',        label: "תמהיל ג'",     icon: BarChart3,   mixId: 'c' as MixId },
-  { to: '/comparison',   label: 'השוואה',        icon: GitCompare,  mixId: undefined    },
-  { to: '/costs',        label: 'הוצאות עסקה',  icon: Receipt,     mixId: undefined    },
-  { to: '/affordability',label: 'כושר החזר',    icon: ShieldCheck, mixId: undefined    },
-  { to: '/investment',   label: 'מחשבון השקעה', icon: TrendingUp,  mixId: undefined    },
+  { to: '/transaction',   label: 'נתוני עסקה',    icon: FileText,    mixId: undefined    },
+  { to: '/mix-a',         label: "תמהיל א'",      icon: LayoutList,  mixId: 'a' as MixId },
+  { to: '/mix-b',         label: "תמהיל ב'",      icon: BarChart3,   mixId: 'b' as MixId },
+  { to: '/mix-c',         label: "תמהיל ג'",      icon: BarChart3,   mixId: 'c' as MixId },
+  { to: '/comparison',    label: 'השוואה',         icon: GitCompare,  mixId: undefined    },
+  { to: '/affordability', label: 'כושר החזר',     icon: ShieldCheck, mixId: undefined    },
+  { to: '/investment',    label: 'מחשבון השקעה',  icon: TrendingUp,  mixId: undefined    },
 ] as const
 
 // ---------------------------------------------------------------------------
 // PTI badge — shows "!40+" on a mix tab when that mix exceeds the 40% limit
-// Visible only when affordability data has been entered (totalIncome > 0).
 // ---------------------------------------------------------------------------
 function PTIBadge({ mixId, dispIncome }: { mixId: MixId; dispIncome: number }) {
   const mix = useMix(mixId)
@@ -91,7 +92,6 @@ function DuplicateDropdown({ sourceMixId }: DuplicateDropdownProps) {
     c: mixC.tracks.length > 0,
   }
 
-  // Close when clicking outside
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
@@ -106,14 +106,12 @@ function DuplicateDropdown({ sourceMixId }: DuplicateDropdownProps) {
   const handleDuplicate = (targetId: MixId) => {
     const targetLabel = MIX_LABELS[targetId]
     const sourceLabel = MIX_LABELS[sourceMixId]
-
     if (hasTracks[targetId]) {
       const confirmed = window.confirm(
         `כדי לשכפל את ${sourceLabel} אל ${targetLabel}, הנתונים הקיימים ב${targetLabel} יימחקו. להמשיך?`
       )
       if (!confirmed) { setOpen(false); return }
     }
-
     duplicateMix(sourceMixId, targetId)
     setOpen(false)
   }
@@ -157,14 +155,42 @@ function DuplicateDropdown({ sourceMixId }: DuplicateDropdownProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Mix tab content — stacked layout with duplicate button at top
+// Clear-mix button — ghost style with Trash2, shows confirm dialog
+// ---------------------------------------------------------------------------
+function ClearMixButton({ mixId }: { mixId: MixId }) {
+  const { clearMix } = useMixStore()
+  const mix          = useMix(mixId)
+  if (mix.tracks.length === 0) return null
+
+  const handleClear = () => {
+    const confirmed = window.confirm(
+      `פעולה זו תנקה את כל המסלולים וההגדרות של ${MIX_LABELS[mixId]}. להמשיך?`
+    )
+    if (confirmed) clearMix(mixId)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClear}
+      className="flex items-center gap-1.5 h-7 px-3 rounded-lg border border-transparent text-kumu-navy-light dark:text-kumu-blue-lighter text-xs font-medium hover:border-kumu-coral/40 hover:bg-kumu-coral/5 hover:text-kumu-coral dark:hover:text-kumu-coral transition-colors"
+    >
+      <Trash2 size={12} />
+      נקה תמהיל
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Mix tab content — stacked layout with toolbar at top
 // ---------------------------------------------------------------------------
 function MixTabContent({ mixId }: { mixId: MixId }) {
   return (
     <div className="flex flex-col gap-4 p-4">
 
-      {/* ── Duplicate toolbar ───────────────────────────────────────────── */}
-      <div className="flex items-center justify-end">
+      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-end gap-2">
+        <ClearMixButton mixId={mixId} />
         <DuplicateDropdown sourceMixId={mixId} />
       </div>
 
@@ -181,7 +207,7 @@ function MixTabContent({ mixId }: { mixId: MixId }) {
       <TracksManager    mixId={mixId} />
       <PrepaymentEvents mixId={mixId} />
 
-      {/* ── Row 3: Charts (two-column grid) ─────────────────────────────── */}
+      {/* ── Row 3: Charts ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4">
         <DistributionDonut mixId={mixId} />
         <PaymentLineChart  mixId={mixId} />
@@ -198,7 +224,7 @@ function MixTabContent({ mixId }: { mixId: MixId }) {
 // Generic mix empty state (Mix B and C)
 // ---------------------------------------------------------------------------
 interface MixEmptyStateProps {
-  mixId:     MixId
+  mixId:      MixId
   otherMixes: MixId[]
 }
 
@@ -221,7 +247,6 @@ function MixEmptyState({ mixId, otherMixes }: MixEmptyStateProps) {
       <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-kumu-navy flex items-center justify-center">
         <Copy size={24} className="text-kumu-navy-light dark:text-kumu-blue-lighter" />
       </div>
-
       <div>
         <h2 className="text-base font-semibold text-kumu-navy dark:text-white mb-2">
           {label} מחכה לכם
@@ -230,7 +255,6 @@ function MixEmptyState({ mixId, otherMixes }: MixEmptyStateProps) {
           תוכלו לשכפל תמהיל קיים כנקודת התחלה, או לבנות תמהיל חדש לגמרי מאפס.
         </p>
       </div>
-
       <div className="flex flex-col items-center gap-3">
         {otherMixes
           .filter((src) => hasTracks[src])
@@ -257,7 +281,7 @@ function MixEmptyState({ mixId, otherMixes }: MixEmptyStateProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Individual mix tabs (show empty state or full content)
+// Individual mix tabs
 // ---------------------------------------------------------------------------
 function MixBTab() {
   const mixB = useMix('b')
@@ -274,30 +298,100 @@ function MixCTab() {
 }
 
 // ---------------------------------------------------------------------------
-// Dashboard — main shell with keyboard shortcuts + footer
+// Toast triggers — PTI > 40% and LTV exceeded
+// One toast per transition (not repeated on every render)
+// ---------------------------------------------------------------------------
+function ToastTriggers({ dispIncome }: { dispIncome: number }) {
+  const show = useToastStore((s) => s.show)
+  const tx   = useTransactionStore()
+
+  // Track previous PTI state per mix to fire toast only on transition
+  const prevPtiRef = useRef<Record<MixId, boolean>>({ a: false, b: false, c: false })
+  // Track previous LTV exceeded state
+  const prevLtvRef = useRef(false)
+  // Track if we already showed the "loaded" toast
+  const loadedToastShownRef = useRef(false)
+
+  const mixA = useMix('a')
+  const mixB = useMix('b')
+  const mixC = useMix('c')
+  const mixes: { id: MixId; mix: typeof mixA }[] = [
+    { id: 'a', mix: mixA },
+    { id: 'b', mix: mixB },
+    { id: 'c', mix: mixC },
+  ]
+
+  // Green "loaded" toast on first mount when localStorage has data
+  useEffect(() => {
+    if (loadedToastShownRef.current) return
+    loadedToastShownRef.current = true
+    const hasData = ['kumu-mix-store', 'kumu-transaction', 'kumu-costs-store', 'kumu-affordability-store']
+      .some((k) => localStorage.getItem(k) !== null)
+    if (hasData) {
+      show({ message: 'הסימולציה נטענה מהזיכרון המקומי', variant: 'green' })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // PTI > 40% toast — fires once per mix when it crosses the threshold
+  useEffect(() => {
+    if (dispIncome <= 0) return
+    mixes.forEach(({ id, mix }) => {
+      if (mix.tracks.length === 0) return
+      const { kpis } = calculateMix(mix.tracks, mix.macroForecasts, mix.prepayments)
+      const exceeds  = calculatePTI(dispIncome, kpis).status === 'exceeds'
+      if (exceeds && !prevPtiRef.current[id]) {
+        show({
+          message: `PTI של ${MIX_LABELS[id]} חורג מ-40% — בדקו את יכולת ההחזר`,
+          variant: 'yellow',
+        })
+      }
+      prevPtiRef.current[id] = exceeds
+    })
+  })
+
+  // LTV exceeded toast — fires once on transition
+  useEffect(() => {
+    const ltv   = tx.propertyValue > 0 ? (tx.mortgageAmount / tx.propertyValue) * 100 : 0
+    const limit = MAX_LTV[tx.purchaseStatus]
+    const exceeded = ltv > limit
+    if (exceeded && !prevLtvRef.current) {
+      show({
+        message: `אחוז המימון (${ltv.toFixed(1)}%) חורג מהמקסימום המותר (${limit}%)`,
+        variant: 'coral',
+      })
+    }
+    prevLtvRef.current = exceeded
+  })
+
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard — main shell with keyboard shortcuts
 // ---------------------------------------------------------------------------
 export function Dashboard() {
   const navigate = useNavigate()
 
-  // Keyboard shortcuts: Ctrl/Cmd + 1…7 → switch tabs
+  // Keyboard shortcuts: Ctrl/Cmd + 1…7
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!e.metaKey && !e.ctrlKey) return
       switch (e.key) {
-        case '1': e.preventDefault(); navigate('/mix-a');      break
-        case '2': e.preventDefault(); navigate('/mix-b');      break
-        case '3': e.preventDefault(); navigate('/mix-c');      break
-        case '4': e.preventDefault(); navigate('/comparison'); break
-        case '5': e.preventDefault(); navigate('/costs');        break
+        case '1': e.preventDefault(); navigate('/transaction');   break
+        case '2': e.preventDefault(); navigate('/mix-a');         break
+        case '3': e.preventDefault(); navigate('/mix-b');         break
+        case '4': e.preventDefault(); navigate('/mix-c');         break
+        case '5': e.preventDefault(); navigate('/comparison');    break
         case '6': e.preventDefault(); navigate('/affordability'); break
-        case '7': e.preventDefault(); navigate('/investment'); break
+        case '7': e.preventDefault(); navigate('/investment');    break
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [navigate])
 
-  // ── Affordability data for PTI badges ────────────────────────────────────
+  // Affordability data for PTI badges
   const incomeRows      = useAffordabilityStore((s) => s.incomeRows)
   const liabilityRows   = useAffordabilityStore((s) => s.liabilityRows)
   const totalIncome     = incomeRows.reduce((s, r) => s + r.amount, 0)
@@ -315,6 +409,9 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen flex flex-col bg-kumu-bg-light dark:bg-kumu-bg-dark">
+      {/* Toast triggers — invisible, side-effect only */}
+      <ToastTriggers dispIncome={dispIncome} />
+
       {/* ── Sticky top bar: header + nav ─────────────────────────────────── */}
       <div className="sticky top-0 z-50 flex flex-col shadow-sm">
         <Header />
@@ -333,21 +430,21 @@ export function Dashboard() {
         </nav>
       </div>
 
-      {/* ── Page content — scrolls naturally ─────────────────────────────── */}
+      {/* ── Page content ─────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col">
         <Routes>
-          <Route path="/mix-a"      element={<MixTabContent mixId="a" />} />
-          <Route path="/mix-b"      element={<MixBTab />} />
-          <Route path="/mix-c"      element={<MixCTab />} />
-          <Route path="/comparison" element={<ComparisonTab />} />
-          <Route path="/costs"      element={<TransactionCostsTab />} />
-          {/* Redirect old /expenses URL (from Stage 7 deploy) */}
-          <Route path="/expenses"   element={<Navigate to="/costs" replace />} />
+          <Route path="/transaction"   element={<TransactionTab />} />
+          <Route path="/mix-a"         element={<MixTabContent mixId="a" />} />
+          <Route path="/mix-b"         element={<MixBTab />} />
+          <Route path="/mix-c"         element={<MixCTab />} />
+          <Route path="/comparison"    element={<ComparisonTab />} />
+          {/* /costs now lives inside /transaction */}
+          <Route path="/costs"         element={<Navigate to="/transaction" replace />} />
+          <Route path="/expenses"      element={<Navigate to="/transaction" replace />} />
           <Route path="/affordability" element={<AffordabilityTab />} />
-          {/* Redirect old /capacity URL (Stage 7 placeholder) */}
           <Route path="/capacity"      element={<Navigate to="/affordability" replace />} />
-          <Route path="/investment" element={<InvestmentTab />} />
-          <Route path="*"           element={<Navigate to="/mix-a" replace />} />
+          <Route path="/investment"    element={<InvestmentTab />} />
+          <Route path="*"              element={<Navigate to="/transaction" replace />} />
         </Routes>
       </div>
 

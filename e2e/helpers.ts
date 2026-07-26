@@ -7,6 +7,7 @@ import { type Page } from '@playwright/test'
 export async function clearAppState(page: Page) {
   await page.evaluate(() => {
     localStorage.removeItem('kumu-mix-store')
+    localStorage.removeItem('kumu-transaction')
     localStorage.removeItem('kumu-costs-store')
     localStorage.removeItem('kumu-affordability-store')
   })

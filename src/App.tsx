@@ -4,6 +4,7 @@ import { ThemeProvider } from '@/components/layout/ThemeProvider'
 import LoginScreen from '@/components/auth/LoginScreen'
 import { Dashboard } from '@/components/layout/Dashboard'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { ToastContainer } from '@/components/ui/Toast'
 
 export default function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -19,6 +20,7 @@ export default function App() {
           ) : (
             <LoginScreen />
           )}
+          <ToastContainer />
         </div>
       </ThemeProvider>
     </ErrorBoundary>

@@ -1,6 +1,18 @@
-import { Sun, Moon, LogOut } from 'lucide-react'
+import { Sun, Moon, LogOut, RotateCcw } from 'lucide-react'
 import { useThemeStore } from '@/store/useThemeStore'
 import { useAuthStore } from '@/store/useAuthStore'
+
+function handleResetAll() {
+  const confirmed = window.confirm(
+    'איפוס הנתונים ימחק את כל הסימולציות השמורות ויחזיר את המערכת למצב ההתחלתי. פעולה זו אינה הפיכה.'
+  )
+  if (!confirmed) return
+  localStorage.removeItem('kumu-mix-store')
+  localStorage.removeItem('kumu-transaction')
+  localStorage.removeItem('kumu-costs-store')
+  localStorage.removeItem('kumu-affordability-store')
+  window.location.reload()
+}
 
 export function Header() {
   const { theme, toggleTheme } = useThemeStore()
@@ -48,6 +60,17 @@ export function Header() {
 
       {/* Controls — left side in RTL */}
       <div className="flex items-center gap-3">
+        {/* Reset all data */}
+        <button
+          type="button"
+          onClick={handleResetAll}
+          title="אפס את כל הנתונים"
+          aria-label="אפס את כל הנתונים"
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-kumu-navy-light dark:text-kumu-blue-lighter hover:bg-gray-100 dark:hover:bg-kumu-navy hover:text-kumu-coral transition-colors"
+        >
+          <RotateCcw size={16} />
+        </button>
+
         {/* Dark / Light toggle */}
         <button
           onClick={toggleTheme}

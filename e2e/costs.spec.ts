@@ -5,10 +5,10 @@ import { test, expect } from '@playwright/test'
 import { clearAppState } from './helpers'
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/costs')
+  await page.goto('/transaction')
   await clearAppState(page)
   await page.reload()
-  await page.waitForURL('**/costs')
+  await page.waitForURL('**/transaction')
 })
 
 test('costs tab loads with fixed rows', async ({ page }) => {

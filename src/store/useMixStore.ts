@@ -67,8 +67,9 @@ interface MixStore {
   mixB: Mix
   mixC: Mix
   // Global inputs
-  updateGlobalInputs:   (id: MixId, partial: Partial<GlobalInputs>)   => void
-  updateMacroForecasts: (id: MixId, partial: Partial<MacroForecasts>) => void
+  updateGlobalInputs:      (id: MixId, partial: Partial<GlobalInputs>)   => void
+  syncFromTransaction:     (id: MixId, data: GlobalInputs) => void
+  updateMacroForecasts:    (id: MixId, partial: Partial<MacroForecasts>) => void
   // Track CRUD
   addTrack:       (id: MixId) => void
   removeTrack:    (id: MixId, trackId: string) => void
@@ -101,6 +102,17 @@ export const useMixStore = create<MixStore>()(
         [key]: {
           ...state[key],
           globalInputs: { ...state[key].globalInputs, ...partial },
+        },
+      }
+    }),
+
+  syncFromTransaction: (id, data) =>
+    set((state) => {
+      const key = toKey(id)
+      return {
+        [key]: {
+          ...state[key],
+          globalInputs: { ...data },
         },
       }
     }),

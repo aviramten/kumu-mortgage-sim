@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { RotateCcw, RefreshCw, AlertCircle } from 'lucide-react'
 import { useMixStore, useMix } from '@/store/useMixStore'
+import { useTransactionStore } from '@/store/useTransactionStore'
 import { ValidationField } from '@/components/ui/ValidationField'
 import { validateLTV, MAX_LTV } from '@/utils/validation'
 import { formatNumber } from '@/utils/format'
 import type { MixId } from '@/types/mix'
-import type { PurchaseStatus } from '@/types/macro'
+import type { GlobalInputs as GlobalInputsType, PurchaseStatus } from '@/types/macro'
 
 // ---------------------------------------------------------------------------
 // Purchase status config
@@ -98,6 +99,18 @@ function LTVBadge({ ltv, limit }: { ltv: number; limit: number }) {
 }
 
 // ---------------------------------------------------------------------------
+// Sync badge — shown when mix globalInputs differ from useTransactionStore
+// ---------------------------------------------------------------------------
+function differsFromTransaction(mix: GlobalInputsType, tx: GlobalInputsType): boolean {
+  return (
+    mix.propertyValue  !== tx.propertyValue  ||
+    mix.equity         !== tx.equity         ||
+    mix.purchaseStatus !== tx.purchaseStatus ||
+    mix.mortgageAmount !== tx.mortgageAmount
+  )
+}
+
+// ---------------------------------------------------------------------------
 // GlobalInputs
 // ---------------------------------------------------------------------------
 interface GlobalInputsProps {
@@ -107,7 +120,16 @@ interface GlobalInputsProps {
 export function GlobalInputs({ mixId }: GlobalInputsProps) {
   const { globalInputs }      = useMix(mixId)
   const updateGlobalInputs    = useMixStore((s) => s.updateGlobalInputs)
+  const syncFromTransaction   = useMixStore((s) => s.syncFromTransaction)
+  const tx                    = useTransactionStore()
   const [isManual, setIsManual] = useState(false)
+
+  const isDifferent = differsFromTransaction(globalInputs, {
+    propertyValue:  tx.propertyValue,
+    equity:         tx.equity,
+    purchaseStatus: tx.purchaseStatus,
+    mortgageAmount: tx.mortgageAmount,
+  })
 
   const { propertyValue, equity, purchaseStatus, mortgageAmount } = globalInputs
   const ltv      = propertyValue > 0 ? (mortgageAmount / propertyValue) * 100 : 0
@@ -146,9 +168,33 @@ export function GlobalInputs({ mixId }: GlobalInputsProps) {
   // -------- render --------
   return (
     <div className="flex flex-col gap-3 p-3 bg-white dark:bg-kumu-surface-dark rounded-xl border border-gray-100 dark:border-kumu-navy-light">
-      <h2 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue px-1">
-        נתוני הנכס
-      </h2>
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue">
+          נתוני הנכס
+        </h2>
+        {isDifferent && (
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1 text-[10px] font-medium text-amber-700 dark:text-kumu-yellow bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-full px-2 py-0.5">
+              <AlertCircle size={10} />
+              שונה מנתוני העסקה הכלליים
+            </span>
+            <button
+              type="button"
+              onClick={() => syncFromTransaction(mixId, {
+                propertyValue:  tx.propertyValue,
+                equity:         tx.equity,
+                purchaseStatus: tx.purchaseStatus,
+                mortgageAmount: tx.mortgageAmount,
+              })}
+              className="flex items-center gap-1 text-[11px] text-kumu-blue hover:text-kumu-blue-light transition-colors"
+              title="אפס לנתונים הכלליים"
+            >
+              <RefreshCw size={11} />
+              אפס
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Property value */}
       <ValidationField result={{ status: 'ok' }} label="שווי הנכס">

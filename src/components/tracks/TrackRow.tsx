@@ -151,6 +151,7 @@ function MonthsCell({ value, onChange, hasError }: {
       inputMode="numeric"
       dir="ltr"
       data-testid="track-months"
+      title="יש להזין את התקופה במספר חודשים. לדוגמה: 25 שנים = 300 חודשים"
       value={focused ? raw : String(value)}
       onFocus={() => { setFocused(true); setRaw(String(value)) }}
       onBlur={() => {

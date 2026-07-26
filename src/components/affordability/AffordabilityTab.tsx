@@ -26,10 +26,12 @@ function NumericInput({
   value,
   onChange,
   placeholder = '0',
+  title,
 }: {
   value: number
   onChange: (v: number) => void
   placeholder?: string
+  title?: string
 }) {
   const [focused, setFocused] = useState(false)
   const [raw, setRaw]         = useState('')
@@ -40,6 +42,7 @@ function NumericInput({
       inputMode="numeric"
       dir="ltr"
       placeholder={placeholder}
+      title={title}
       value={focused ? raw : (value === 0 ? '' : formatNumber(value))}
       onFocus={() => {
         setFocused(true)
@@ -252,7 +255,7 @@ function LiabilitiesSection() {
                 </div>
                 <NumericInput value={row.monthlyPayment} onChange={(v) => updateLiability(row.id, 'monthlyPayment', v)} />
                 <NumericInput value={row.balance} onChange={(v) => updateLiability(row.id, 'balance', v)} />
-                <NumericInput value={row.remainingMonths} onChange={(v) => updateLiability(row.id, 'remainingMonths', v)} />
+                <NumericInput value={row.remainingMonths} onChange={(v) => updateLiability(row.id, 'remainingMonths', v)} title="יש להזין את התקופה במספר חודשים. לדוגמה: 25 שנים = 300 חודשים" />
                 <div className="flex justify-center">
                   {!row.isFixed && (
                     <button
