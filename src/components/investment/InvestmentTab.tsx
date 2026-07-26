@@ -10,7 +10,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ReferenceLine, ResponsiveContainer,
+  Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { useThemeStore } from '@/store/useThemeStore'
 import {
@@ -202,6 +202,44 @@ function CustomTooltip({
 }
 
 // ---------------------------------------------------------------------------
+// Spitzer savings curve — approximates cumulative interest saved over time.
+// Uses a fixed 5% annual rate just to get the Spitzer curve shape, then
+// scales so the final value equals `totalSavings`. Result: Map<year, amount>.
+// ---------------------------------------------------------------------------
+function buildSpitzerSavingsCurve(totalSavings: number, years: number): Map<number, number> {
+  const result = new Map<number, number>()
+  if (totalSavings <= 0 || years <= 0) return result
+
+  const N = years * 12
+  const r = 0.05 / 12  // 5% used only for curve shape
+
+  const discountFactor  = 1 - Math.pow(1 + r, -N)
+  const paymentFactor   = r / discountFactor
+  const interestFactor  = paymentFactor * N - 1  // total interest per ₪ of principal
+
+  if (interestFactor <= 0) return result
+
+  const principal      = totalSavings / interestFactor
+  const monthlyPayment = principal * paymentFactor
+
+  let balance            = principal
+  let cumulativeInterest = 0
+
+  for (let m = 1; m <= N; m++) {
+    const interestPmt   = balance * r
+    const principalPmt  = monthlyPayment - interestPmt
+    cumulativeInterest += interestPmt
+    balance             = Math.max(0, balance - principalPmt)
+
+    if (m % 12 === 0) {
+      result.set(m / 12, Math.round(cumulativeInterest))
+    }
+  }
+
+  return result
+}
+
+// ---------------------------------------------------------------------------
 // Public component
 // ---------------------------------------------------------------------------
 export function InvestmentTab() {
@@ -229,13 +267,20 @@ export function InvestmentTab() {
     [inputs],
   )
 
-  // Chart data: portfolio growth per year
+  // Spitzer savings curve
+  const savingsCurve = useMemo(
+    () => buildSpitzerSavingsCurve(comparisonAmount, inputs.years),
+    [comparisonAmount, inputs.years],
+  )
+
+  // Chart data: portfolio growth + optional savings curve per year
   const chartData = useMemo(
     () => investResult.yearlyPortfolio.map((p) => ({
-      year:      p.year,
-      portfolio: Math.round(p.value),
+      year:           p.year,
+      portfolio:      Math.round(p.value),
+      mortgageSavings: comparisonAmount > 0 ? (savingsCurve.get(p.year) ?? null) : null,
     })),
-    [investResult.yearlyPortfolio],
+    [investResult.yearlyPortfolio, savingsCurve, comparisonAmount],
   )
 
   const axisStyle = getChartAxisStyle(isDark)
@@ -419,23 +464,28 @@ export function InvestmentTab() {
                   />
 
                   {hasComparison && (
-                    <ReferenceLine
-                      y={comparisonAmount}
+                    <Area
+                      type="monotone"
+                      dataKey="mortgageSavings"
+                      name="חסכון במשכנתא (משוער)"
                       stroke="#E87A5D"
-                      strokeWidth={1.5}
-                      strokeDasharray="5 3"
-                      label={{
-                        value: `סכום להשוואה: ₪${formatNumber(comparisonAmount)}`,
-                        position: 'insideTopRight',
-                        fontSize: 10,
-                        fill: '#E87A5D',
-                        fontFamily: 'Heebo, sans-serif',
-                      }}
+                      strokeWidth={2}
+                      strokeDasharray="6 3"
+                      fill="none"
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 0 }}
+                      isAnimationActive={false}
+                      connectNulls
                     />
                   )}
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+            {hasComparison && (
+              <p className="px-4 pb-3 text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter/80 leading-snug">
+                * החסכון במשכנתא לאורך התקופה הוא אומדן גס המבוסס על לוח שפיצר ואינו מחושב על פי פרמטרי המשכנתא שלכם.
+              </p>
+            )}
           </div>
         )}
 
