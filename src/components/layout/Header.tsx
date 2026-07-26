@@ -22,36 +22,11 @@ export function Header() {
     <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 bg-white dark:bg-kumu-surface-dark border-b border-gray-100 dark:border-kumu-navy-light">
 
       {/* Logo — right side in RTL */}
-      <div className="flex items-center gap-2.5">
-        {/* K mark — inline SVG, gradient adapts to dark/light mode via CSS vars */}
-        <svg
-          viewBox="0 0 44 46"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-[28px] h-[30px] flex-shrink-0"
-          aria-hidden="true"
-        >
-          <defs>
-            <linearGradient id="headerKGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%"   stopColor="var(--kumu-k-start)" />
-              <stop offset="100%" stopColor="var(--kumu-k-end)" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M0 0 H13 V46 H0 Z M13 14 L44 0 L44 14 L13 26 Z M13 26 L44 32 L44 46 L13 40 Z"
-            fill="url(#headerKGrad)"
-          />
-        </svg>
-
-        <div className="flex flex-col leading-none">
-          <span className="text-kumu-navy dark:text-white font-bold text-base tracking-wide">
-            KUMU
-          </span>
-          <span className="text-[#5C6FA0] dark:text-kumu-blue-lighter text-[10px]">
-            Digital Investing Academy
-          </span>
-        </div>
-      </div>
+      <img
+        src="/kumu-logo.png"
+        alt="KUMU Digital Investing Academy"
+        className="h-8 w-auto flex-shrink-0 dark:brightness-0 dark:invert"
+      />
 
       {/* Page title — center */}
       <h1 className="text-kumu-navy dark:text-white font-medium text-sm">
