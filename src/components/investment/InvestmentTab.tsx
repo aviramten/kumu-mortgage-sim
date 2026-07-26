@@ -110,9 +110,44 @@ function ComparisonInput({ value, onChange }: { value: number; onChange: (v: num
           className="w-full text-sm rounded-lg border border-gray-200 dark:border-kumu-navy-light bg-transparent text-kumu-navy dark:text-white px-3 pr-7 py-2 outline-none focus:border-kumu-blue transition-colors"
         />
       </div>
-      <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter/70 leading-snug">
-        לדוגמה: עלות ריבית משכנתא, עלות שכירות, פירעון מוקדם
-      </p>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Risk disclaimer modal
+// ---------------------------------------------------------------------------
+function RiskModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative max-w-sm w-full mx-4 rounded-2xl bg-white dark:bg-kumu-surface-dark border border-gray-100 dark:border-kumu-navy-light shadow-2xl p-6 flex flex-col gap-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-kumu-yellow text-lg">
+            ⚠
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-kumu-navy dark:text-white mb-1">
+              שים לב לפני שממשיכים
+            </h3>
+            <p className="text-sm text-kumu-navy dark:text-white/90 leading-relaxed">
+              חשוב לזכור שהחסכון במשכנתא הינו ברמה גבוהה של ודאות, והתשואה על ההשקעה כרוכה בסיכון בהתאם לאופי ההשקעה.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="self-end px-5 py-2 rounded-xl bg-kumu-blue text-white text-sm font-medium hover:bg-kumu-blue-light transition-colors"
+        >
+          הבנתי
+        </button>
+      </div>
     </div>
   )
 }
@@ -175,12 +210,18 @@ export function InvestmentTab() {
 
   const [inputs, setInputs]               = useState<InvestmentInputs>(DEFAULT_INPUTS)
   const [comparisonAmount, setComparison] = useState(0)
+  const [showRiskModal, setShowRiskModal] = useState(false)
 
   const update = useCallback(
     <K extends keyof InvestmentInputs>(key: K, value: InvestmentInputs[K]) =>
       setInputs((prev) => ({ ...prev, [key]: value })),
     [],
   )
+
+  const handleAnnualReturnChange = useCallback((v: number) => {
+    update('annualReturn', v)
+    if (v > 0) setShowRiskModal(true)
+  }, [update])
 
   // Investment calculation
   const investResult = useMemo(
@@ -207,6 +248,8 @@ export function InvestmentTab() {
   const compAccent = netDiff > 0 ? 'text-kumu-green' : netDiff < 0 ? 'text-kumu-coral' : 'text-kumu-blue'
 
   return (
+    <>
+    {showRiskModal && <RiskModal onClose={() => setShowRiskModal(false)} />}
     <div className="flex-1 grid grid-cols-[2fr_3fr] gap-4 p-4 min-h-0 overflow-hidden">
 
       {/* ── Inputs column (RIGHT in RTL) ── */}
@@ -245,7 +288,7 @@ export function InvestmentTab() {
             <InputRow
               label="תשואה שנתית צפויה"
               value={inputs.annualReturn}
-              onChange={(v) => update('annualReturn', v)}
+              onChange={handleAnnualReturnChange}
               min={0}
               max={30}
               step={0.5}
@@ -432,5 +475,6 @@ export function InvestmentTab() {
 
       </div>
     </div>
+    </>
   )
 }
