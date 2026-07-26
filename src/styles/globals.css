@@ -40,6 +40,16 @@
 /* Dark mode via .dark class on ancestor */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* K mark gradient stops — adapt to theme */
+:root {
+  --kumu-k-start: #1A2456;
+  --kumu-k-end:   #3B5BDB;
+}
+.dark {
+  --kumu-k-start: #4B6BFF;
+  --kumu-k-end:   #7EA3FF;
+}
+
 /* Global base styles */
 * {
   box-sizing: border-box;

@@ -23,18 +23,18 @@ export function Header() {
 
       {/* Logo — right side in RTL */}
       <div className="flex items-center gap-2.5">
-        {/* K mark — inline SVG so it renders at all sizes without a network request */}
+        {/* K mark — inline SVG, gradient adapts to dark/light mode via CSS vars */}
         <svg
           viewBox="0 0 44 46"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="w-[30px] h-[32px] flex-shrink-0"
+          className="w-[28px] h-[30px] flex-shrink-0"
           aria-hidden="true"
         >
           <defs>
             <linearGradient id="headerKGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%"   stopColor="#1A2456" />
-              <stop offset="100%" stopColor="#3B5BDB" />
+              <stop offset="0%"   stopColor="var(--kumu-k-start)" />
+              <stop offset="100%" stopColor="var(--kumu-k-end)" />
             </linearGradient>
           </defs>
           <path
