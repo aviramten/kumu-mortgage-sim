@@ -1,31 +1,28 @@
 /**
- * InvestmentTab — investment calculator comparing portfolio growth vs mortgage cost.
+ * InvestmentTab — investment calculator.
  *
  * Layout: split panel (RTL)
  *   Right column → inputs
- *   Left  column → KPI cards + Area chart + Decision matrix
+ *   Left  column → KPI cards + Area chart + comparison summary
  */
 
 import { useState, useMemo, useCallback } from 'react'
-import { RefreshCw, Link2, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer,
+  Tooltip, Legend, ReferenceLine, ResponsiveContainer,
 } from 'recharts'
-import { useMix } from '@/store/useMixStore'
 import { useThemeStore } from '@/store/useThemeStore'
-import { calculateMix } from '@/engine/calculateMix'
 import {
   calculateInvestment,
-  buildDecisionMatrix,
 } from '@/engine/calculateInvestment'
 import type { InvestmentInputs } from '@/engine/calculateInvestment'
 import {
-  MIX_A_COLOR, MIX_B_COLOR,
+  MIX_A_COLOR,
   getChartTooltipStyle, getChartAxisStyle,
   CHART_GRID_COLOR_LIGHT, CHART_GRID_COLOR_DARK,
 } from '@/utils/chartTheme'
-import { formatCurrencyWhole } from '@/utils/format'
+import { formatCurrencyWhole, formatNumber } from '@/utils/format'
 import {
   DEFAULT_EXPECTED_RETURN,
   DEFAULT_CAPITAL_GAINS_TAX,
@@ -77,6 +74,45 @@ function InputRow({
           </span>
         )}
       </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Comparison amount input (₪ prefix, blur-committed)
+// ---------------------------------------------------------------------------
+function ComparisonInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [focused, setFocused] = useState(false)
+  const [raw, setRaw]         = useState('')
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-[10px] font-semibold uppercase tracking-widest text-kumu-navy-light dark:text-kumu-blue-lighter">
+        סכום להשוואה (חסכון במשכנתא)
+      </label>
+      <div className="relative flex items-center">
+        <span className="absolute right-3 text-xs text-kumu-navy-light dark:text-kumu-blue-lighter pointer-events-none">
+          ₪
+        </span>
+        <input
+          type="text"
+          inputMode="numeric"
+          dir="ltr"
+          placeholder="0"
+          value={focused ? raw : (value === 0 ? '' : formatNumber(value))}
+          onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
+          onBlur={() => {
+            setFocused(false)
+            const n = parseInt(raw.replace(/\D/g, ''), 10)
+            onChange(isNaN(n) ? 0 : n)
+          }}
+          onChange={(e) => setRaw(e.target.value.replace(/\D/g, ''))}
+          className="w-full text-sm rounded-lg border border-gray-200 dark:border-kumu-navy-light bg-transparent text-kumu-navy dark:text-white px-3 pr-7 py-2 outline-none focus:border-kumu-blue transition-colors"
+        />
+      </div>
+      <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter/70 leading-snug">
+        לדוגמה: עלות ריבית משכנתא, עלות שכירות, פירעון מוקדם
+      </p>
     </div>
   )
 }
@@ -134,11 +170,11 @@ function CustomTooltip({
 // Public component
 // ---------------------------------------------------------------------------
 export function InvestmentTab() {
-  const mixA       = useMix('a')
   const { theme }  = useThemeStore()
   const isDark     = theme === 'dark'
 
-  const [inputs, setInputs] = useState<InvestmentInputs>(DEFAULT_INPUTS)
+  const [inputs, setInputs]               = useState<InvestmentInputs>(DEFAULT_INPUTS)
+  const [comparisonAmount, setComparison] = useState(0)
 
   const update = useCallback(
     <K extends keyof InvestmentInputs>(key: K, value: InvestmentInputs[K]) =>
@@ -146,84 +182,29 @@ export function InvestmentTab() {
     [],
   )
 
-  // Adapt to Mix A: use equity as initial capital + loan term as years
-  const handleAdaptToMixA = useCallback(() => {
-    const maxMonths = mixA.tracks.length > 0
-      ? Math.max(...mixA.tracks.map((t) => t.months))
-      : 240
-    setInputs((prev) => ({
-      ...prev,
-      initialCapital: mixA.globalInputs.equity,
-      years:          Math.round(maxMonths / 12),
-    }))
-  }, [mixA])
-
-  // Mortgage cumulative cost per year from Mix A
-  const mixAResult = useMemo(
-    () => calculateMix(mixA.tracks, mixA.macroForecasts, mixA.prepayments),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mixA.tracks, mixA.macroForecasts, mixA.prepayments],
-  )
-
-  const cumulativeMortgageByYear = useMemo(() => {
-    const monthlyMap = new Map<number, number>()
-    for (const tr of mixAResult.trackResults) {
-      for (const row of tr.rows) {
-        monthlyMap.set(row.month, (monthlyMap.get(row.month) ?? 0) + row.totalPayment)
-      }
-    }
-    const sorted = Array.from(monthlyMap.entries()).sort(([a], [b]) => a - b)
-    let cumulative = 0
-    const result: { year: number; cost: number }[] = []
-    for (const [month, payment] of sorted) {
-      cumulative += payment
-      if (month % 12 === 0) {
-        result.push({ year: month / 12, cost: cumulative })
-      }
-    }
-    return result
-  }, [mixAResult.trackResults])
-
   // Investment calculation
   const investResult = useMemo(
     () => calculateInvestment(inputs),
     [inputs],
   )
 
-  // Decision matrix
-  const matrix = useMemo(
-    () => buildDecisionMatrix(
-      mixAResult.kpis.totalInterest,
-      mixAResult.kpis.totalIndexation,
-      investResult.netProfit,
-    ),
-    [mixAResult.kpis, investResult.netProfit],
+  // Chart data: portfolio growth per year
+  const chartData = useMemo(
+    () => investResult.yearlyPortfolio.map((p) => ({
+      year:      p.year,
+      portfolio: Math.round(p.value),
+    })),
+    [investResult.yearlyPortfolio],
   )
-
-  // Chart data: merge yearly portfolio vs cumulative mortgage
-  const chartData = useMemo(() => {
-    const mortgageMap = new Map(cumulativeMortgageByYear.map((p) => [p.year, p.cost]))
-    const maxYear = Math.max(
-      inputs.years,
-      cumulativeMortgageByYear.length > 0
-        ? cumulativeMortgageByYear[cumulativeMortgageByYear.length - 1].year
-        : 0,
-    )
-    return investResult.yearlyPortfolio
-      .filter((p) => p.year <= maxYear)
-      .map((p) => ({
-        year: p.year,
-        portfolio:       Math.round(p.value),
-        mortgageCost:    Math.round(mortgageMap.get(p.year) ?? 0),
-      }))
-  }, [investResult.yearlyPortfolio, cumulativeMortgageByYear, inputs.years])
 
   const axisStyle = getChartAxisStyle(isDark)
   const gridColor = isDark ? CHART_GRID_COLOR_DARK : CHART_GRID_COLOR_LIGHT
 
-  // Decision matrix icon
-  const MatrixIcon = matrix.netDiff > 0 ? TrendingUp : matrix.netDiff < 0 ? TrendingDown : Minus
-  const matrixAccent = matrix.netDiff > 0 ? 'text-kumu-green' : matrix.netDiff < 0 ? 'text-kumu-coral' : 'text-kumu-blue'
+  // Comparison summary
+  const netDiff = investResult.netProfit - comparisonAmount
+  const hasComparison = comparisonAmount > 0
+  const CompIcon = netDiff > 0 ? TrendingUp : netDiff < 0 ? TrendingDown : Minus
+  const compAccent = netDiff > 0 ? 'text-kumu-green' : netDiff < 0 ? 'text-kumu-coral' : 'text-kumu-blue'
 
   return (
     <div className="flex-1 grid grid-cols-[2fr_3fr] gap-4 p-4 min-h-0 overflow-hidden">
@@ -232,7 +213,7 @@ export function InvestmentTab() {
       <div className="flex flex-col gap-3 overflow-y-auto">
         <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
           {/* Header */}
-          <div className="px-4 py-3 border-b border-gray-100 dark:border-kumu-navy-light flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-kumu-navy-light">
             <h2 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
               פרמטרי ההשקעה
             </h2>
@@ -280,25 +261,21 @@ export function InvestmentTab() {
               suffix="%"
             />
 
-            {/* Action buttons */}
-            <div className="flex gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setInputs(DEFAULT_INPUTS)}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-kumu-navy-light text-kumu-navy-light dark:text-kumu-blue-lighter text-xs py-2 hover:bg-gray-50 dark:hover:bg-kumu-navy transition-colors"
-              >
-                <RefreshCw size={12} />
-                אפס לברירת מחדל
-              </button>
-              <button
-                type="button"
-                onClick={handleAdaptToMixA}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-kumu-blue/10 text-kumu-blue text-xs py-2 hover:bg-kumu-blue/20 transition-colors"
-              >
-                <Link2 size={12} />
-                התאם לתמהיל א'
-              </button>
-            </div>
+            {/* Reset button */}
+            <button
+              type="button"
+              onClick={() => setInputs(DEFAULT_INPUTS)}
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-kumu-navy-light text-kumu-navy-light dark:text-kumu-blue-lighter text-xs py-2 hover:bg-gray-50 dark:hover:bg-kumu-navy transition-colors"
+            >
+              <RefreshCw size={12} />
+              אפס לברירת מחדל
+            </button>
+
+            {/* Divider */}
+            <div className="h-px bg-gray-100 dark:bg-kumu-navy-light" />
+
+            {/* Comparison amount */}
+            <ComparisonInput value={comparisonAmount} onChange={setComparison} />
           </div>
         </div>
       </div>
@@ -335,7 +312,7 @@ export function InvestmentTab() {
           <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100 dark:border-kumu-navy-light">
               <h3 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
-                תיק השקעות מול עלות משכנתא מצטברת
+                צמיחת תיק ההשקעות לאורך הזמן
               </h3>
             </div>
             <div className="p-3">
@@ -345,10 +322,6 @@ export function InvestmentTab() {
                     <linearGradient id="gradPortfolio" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%"  stopColor={MIX_A_COLOR} stopOpacity={0.18} />
                       <stop offset="95%" stopColor={MIX_A_COLOR} stopOpacity={0.02} />
-                    </linearGradient>
-                    <linearGradient id="gradMortgage" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor={MIX_B_COLOR} stopOpacity={0.18} />
-                      <stop offset="95%" stopColor={MIX_B_COLOR} stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
 
@@ -402,59 +375,60 @@ export function InvestmentTab() {
                     isAnimationActive={false}
                   />
 
-                  <Area
-                    type="monotone"
-                    dataKey="mortgageCost"
-                    name="עלות משכנתא מצטברת"
-                    stroke={MIX_B_COLOR}
-                    strokeWidth={2.5}
-                    fill="url(#gradMortgage)"
-                    dot={false}
-                    activeDot={{ r: 4, strokeWidth: 0 }}
-                    isAnimationActive={false}
-                  />
+                  {hasComparison && (
+                    <ReferenceLine
+                      y={comparisonAmount}
+                      stroke="#E87A5D"
+                      strokeWidth={1.5}
+                      strokeDasharray="5 3"
+                      label={{
+                        value: `סכום להשוואה: ₪${formatNumber(comparisonAmount)}`,
+                        position: 'insideTopRight',
+                        fontSize: 10,
+                        fill: '#E87A5D',
+                        fontFamily: 'Heebo, sans-serif',
+                      }}
+                    />
+                  )}
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
         )}
 
-        {/* Decision matrix card */}
-        <div className="rounded-xl border border-kumu-blue/20 dark:border-kumu-blue/30 bg-kumu-blue/5 dark:bg-kumu-blue/10 overflow-hidden">
-          <div className="px-4 py-3 border-b border-kumu-blue/10 dark:border-kumu-blue/20 flex items-center gap-2">
-            <MatrixIcon size={15} className={matrixAccent} />
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
-              מטריצת ההחלטה
-            </h3>
-          </div>
-          <div className="p-4 flex flex-col gap-3">
-            {/* Summary numbers */}
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div>
-                <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter mb-0.5">עלות משכנתא</p>
-                <p className="text-sm font-semibold tabular-nums text-kumu-coral">
-                  {formatCurrencyWhole(matrix.mortgageCost)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter mb-0.5">רווח השקעה נטו</p>
-                <p className="text-sm font-semibold tabular-nums text-kumu-green">
-                  {formatCurrencyWhole(matrix.investmentGain)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter mb-0.5">פער נטו</p>
-                <p className={`text-sm font-semibold tabular-nums ${matrixAccent}`}>
-                  {matrix.netDiff >= 0 ? '+' : ''}{formatCurrencyWhole(matrix.netDiff)}
-                </p>
+        {/* Comparison summary — only when comparisonAmount > 0 */}
+        {hasComparison && (
+          <div className="rounded-xl border border-kumu-blue/20 dark:border-kumu-blue/30 bg-kumu-blue/5 dark:bg-kumu-blue/10 overflow-hidden">
+            <div className="px-4 py-3 border-b border-kumu-blue/10 dark:border-kumu-blue/20 flex items-center gap-2">
+              <CompIcon size={15} className={compAccent} />
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
+                מטריצת ההחלטה
+              </h3>
+            </div>
+            <div className="p-4 flex flex-col gap-3">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter mb-0.5">חסכון במשכנתא</p>
+                  <p className="text-sm font-semibold tabular-nums text-kumu-coral">
+                    {formatCurrencyWhole(comparisonAmount)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter mb-0.5">רווח השקעה נטו</p>
+                  <p className="text-sm font-semibold tabular-nums text-kumu-green">
+                    {formatCurrencyWhole(Math.max(0, investResult.netProfit))}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter mb-0.5">פער נטו</p>
+                  <p className={`text-sm font-semibold tabular-nums ${compAccent}`}>
+                    {netDiff >= 0 ? '+' : ''}{formatCurrencyWhole(netDiff)}
+                  </p>
+                </div>
               </div>
             </div>
-            {/* Recommendation */}
-            <p className="text-sm text-kumu-navy dark:text-white leading-relaxed border-t border-kumu-blue/10 dark:border-kumu-blue/20 pt-3">
-              {matrix.recommendation}
-            </p>
           </div>
-        </div>
+        )}
 
       </div>
     </div>
