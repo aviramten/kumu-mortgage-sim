@@ -21,12 +21,9 @@ export function Header() {
   return (
     <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 bg-white dark:bg-kumu-surface-dark border-b border-gray-100 dark:border-kumu-navy-light">
 
-      {/* Logo — right side in RTL */}
-      <img
-        src="/kumu-logo.png"
-        alt="KUMU Digital Investing Academy"
-        className="h-8 w-auto flex-shrink-0 dark:brightness-0 dark:invert"
-      />
+      {/* Logo — right side in RTL. Two files: colored for light, white for dark */}
+      <img src="/kumu-logo.png" alt="KUMU" className="h-8 w-auto flex-shrink-0 dark:hidden" />
+      <img src="/kumu-logo-white.png" alt="KUMU" className="h-8 w-auto flex-shrink-0 hidden dark:block" />
 
       {/* Page title — center */}
       <h1 className="text-kumu-navy dark:text-white font-medium text-sm">
