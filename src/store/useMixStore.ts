@@ -14,7 +14,6 @@ import {
   DEFAULT_BANK_MARGIN_USD,
   DEFAULT_EQUITY,
   DEFAULT_EURIBOR_RATE,
-  DEFAULT_PRIME_RATE,
   DEFAULT_PROPERTY_VALUE,
   DEFAULT_SOFR_RATE,
 } from '@/utils/constants'
@@ -133,15 +132,12 @@ export const useMixStore = create<MixStore>()(
     set((state) => {
       const key   = toKey(id)
       const mix   = state[key]
-      // Default amount = remaining unallocated portion of the mortgage
-      const allocated = mix.tracks.reduce((sum, t) => sum + t.amount, 0)
-      const remaining = Math.max(0, mix.globalInputs.mortgageAmount - allocated)
       const newTrack: LoanTrack = {
         id:                   crypto.randomUUID(),
         type:                 'prime',
-        amount:               remaining,
-        months:               240,
-        annualRate:           DEFAULT_PRIME_RATE,
+        amount:               0,
+        months:               0,
+        annualRate:           0,
         schedule:             'spitzer',
         graceType:            'none',
         graceMonths:          0,
