@@ -3,7 +3,7 @@
  * Route: /transaction
  */
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { RotateCcw, Plus, X, ArrowLeftRight, FileText, Trash2 } from 'lucide-react'
 import { useTransactionStore } from '@/store/useTransactionStore'
 import { useCostsStore } from '@/store/useCostsStore'
@@ -107,14 +107,35 @@ function TransactionInputs() {
   const maxLTV   = MAX_LTV[purchaseStatus]
   const ltvResult = validateLTV(ltv, purchaseStatus)
 
-  const setProperty = (v: number) => {
-    update({ propertyValue: v, ...(!isManual && { mortgageAmount: v - equity }) })
+  // Always keep a fresh ref so the costs-change effect doesn't suffer stale closures
+  const stateRef = useRef({ propertyValue, equity, isManual })
+  stateRef.current = { propertyValue, equity, isManual }
+
+  // Auto-recalculate mortgage when the costs table changes
+  const isMounted = useRef(false)
+  useEffect(() => {
+    if (!isMounted.current) { isMounted.current = true; return }
+    const { propertyValue: pv, equity: eq, isManual: manual } = stateRef.current
+    if (manual) return
+    update({ mortgageAmount: Math.max(0, pv - Math.max(0, eq - costs)) })
+    // update is a stable Zustand action — intentionally omitted from deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [costs])
+
+  // netEquity = equity after deducting all transaction costs
+  const autoMortgage = (pv: number, eq: number) => Math.max(0, pv - Math.max(0, eq - costs))
+
+  const setProperty   = (v: number) => {
+    update({ propertyValue: v, ...(!isManual && { mortgageAmount: autoMortgage(v, equity) }) })
   }
-  const setEquity = (v: number) => {
-    update({ equity: v, ...(!isManual && { mortgageAmount: propertyValue - v }) })
+  const setEquity     = (v: number) => {
+    update({ equity: v, ...(!isManual && { mortgageAmount: autoMortgage(propertyValue, v) }) })
   }
-  const setMortgage = (v: number) => { setIsManual(true); update({ mortgageAmount: v }) }
-  const resetMortgage = () => { setIsManual(false); update({ mortgageAmount: propertyValue - equity }) }
+  const setMortgage   = (v: number) => { setIsManual(true); update({ mortgageAmount: v }) }
+  const resetMortgage = () => {
+    setIsManual(false)
+    update({ mortgageAmount: autoMortgage(propertyValue, equity) })
+  }
 
   return (
     <div className="flex flex-col gap-3 p-4 bg-white dark:bg-kumu-surface-dark rounded-xl border border-gray-100 dark:border-kumu-navy-light">
