@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { GlobalInputs } from '@/types/macro'
-import { DEFAULT_EQUITY, DEFAULT_PROPERTY_VALUE } from '@/utils/constants'
 
 interface TransactionStore extends GlobalInputs {
   update: (partial: Partial<GlobalInputs>) => void
@@ -11,10 +10,10 @@ interface TransactionStore extends GlobalInputs {
 export const useTransactionStore = create<TransactionStore>()(
   persist(
     (set) => ({
-      propertyValue:  DEFAULT_PROPERTY_VALUE,
-      equity:         DEFAULT_EQUITY,
+      propertyValue:  0,
+      equity:         0,
       purchaseStatus: 'first' as const,
-      mortgageAmount: DEFAULT_PROPERTY_VALUE - DEFAULT_EQUITY,
+      mortgageAmount: 0,
 
       update: (partial) =>
         set((s) => ({ ...s, ...partial })),
@@ -28,13 +27,21 @@ export const useTransactionStore = create<TransactionStore>()(
         }),
     }),
     {
-      name: 'kumu-transaction',
+      name:    'kumu-transaction',
+      version: 1,
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
         propertyValue:  s.propertyValue,
         equity:         s.equity,
         purchaseStatus: s.purchaseStatus,
         mortgageAmount: s.mortgageAmount,
+      }),
+      // v0 had non-zero defaults (2,000,000 / 600,000) — reset to blank on upgrade
+      migrate: () => ({
+        propertyValue:  0,
+        equity:         0,
+        purchaseStatus: 'first' as const,
+        mortgageAmount: 0,
       }),
     }
   )

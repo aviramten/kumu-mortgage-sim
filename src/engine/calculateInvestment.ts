@@ -3,10 +3,13 @@
  *
  * Formula (monthly compounding):
  *   monthlyFactor = (1 + annualReturn / 100) ^ (1/12)
- *   balance       = (balance + monthlyDeposit) * monthlyFactor
+ *   balance       = (balance + monthlyDeposit) * monthlyFactor * (1 − monthlyFeeRate)
  *
  * Capital-gains tax: applied only to the PROFIT (not the principal deposits).
  * netValue = grossValue − (grossProfit × taxRate)
+ *
+ * Management fee: deducted monthly from the balance as a fraction of AUM.
+ * Reduces the effective compound return without affecting the tax base directly.
  */
 
 // ---------------------------------------------------------------------------
@@ -14,7 +17,7 @@
 // ---------------------------------------------------------------------------
 
 export interface InvestmentInputs {
-  /** ₪ — initial invested capital (e.g. down-payment saved, windfall) */
+  /** ₪ — initial invested capital */
   initialCapital: number
   /** ₪ — monthly recurring deposit */
   monthlyDeposit: number
@@ -24,6 +27,8 @@ export interface InvestmentInputs {
   annualReturn: number
   /** Capital gains tax rate, % (e.g. 25) */
   capitalGainsTax: number
+  /** Annual management / advisory fee, % of AUM (e.g. 0.5 for 0.5%) */
+  managementFeeRate?: number
 }
 
 export interface YearlyPoint {
@@ -35,7 +40,7 @@ export interface YearlyPoint {
 }
 
 export interface InvestmentResult {
-  /** Final portfolio value before tax */
+  /** Final portfolio value before tax (but after management fees) */
   grossValue: number
   /** Final portfolio value after capital-gains tax on profit only */
   netValue: number
@@ -58,22 +63,33 @@ export interface DecisionMatrix {
   recommendation: string
 }
 
+export interface SensitivityRow {
+  rate:           number
+  netValue:       number
+  diff:           number
+  investmentWins: boolean
+}
+
 // ---------------------------------------------------------------------------
 // Core engine
 // ---------------------------------------------------------------------------
 
 export function calculateInvestment(inputs: InvestmentInputs): InvestmentResult {
-  const { initialCapital, monthlyDeposit, years, annualReturn, capitalGainsTax } = inputs
+  const {
+    initialCapital, monthlyDeposit, years, annualReturn, capitalGainsTax,
+    managementFeeRate = 0,
+  } = inputs
 
-  const months        = Math.round(years * 12)
-  // Geometric monthly factor — equivalent to compound annual return
-  const monthlyFactor = Math.pow(1 + annualReturn / 100, 1 / 12)
+  const months         = Math.round(years * 12)
+  const monthlyFactor  = Math.pow(1 + annualReturn / 100, 1 / 12)
+  const monthlyFeeRate = managementFeeRate / 100 / 12
 
   let balance = initialCapital
   const yearlyPortfolio: { year: number; value: number }[] = []
 
   for (let m = 1; m <= months; m++) {
     balance = (balance + monthlyDeposit) * monthlyFactor
+    if (monthlyFeeRate > 0) balance *= (1 - monthlyFeeRate)
     if (m % 12 === 0) {
       yearlyPortfolio.push({ year: m / 12, value: balance })
     }
@@ -90,19 +106,77 @@ export function calculateInvestment(inputs: InvestmentInputs): InvestmentResult 
 }
 
 // ---------------------------------------------------------------------------
+// Break-even rate
+// Binary-search for the minimum annualReturn at which netValue >= targetNetValue.
+// Returns null if even 100% return can't reach the target (infeasible).
+// annualReturn in inputs is ignored — we search over it.
+// ---------------------------------------------------------------------------
+
+export function calcBreakEvenRate(
+  inputs:          InvestmentInputs,
+  targetNetValue:  number,
+): number | null {
+  if (targetNetValue <= 0) return 0
+
+  const MAX_RATE = 100
+
+  if (calculateInvestment({ ...inputs, annualReturn: MAX_RATE }).netValue < targetNetValue) {
+    return null
+  }
+  if (calculateInvestment({ ...inputs, annualReturn: 0 }).netValue >= targetNetValue) {
+    return 0
+  }
+
+  let lo = 0
+  let hi = MAX_RATE
+
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2
+    if (calculateInvestment({ ...inputs, annualReturn: mid }).netValue < targetNetValue) {
+      lo = mid
+    } else {
+      hi = mid
+    }
+    if (hi - lo < 0.001) break
+  }
+
+  return Math.round((lo + hi) / 2 * 10) / 10   // round to 1 decimal place
+}
+
+// ---------------------------------------------------------------------------
+// Sensitivity table
+// annualReturn in inputs is ignored — rates[] overrides it.
+// ---------------------------------------------------------------------------
+
+export function buildSensitivityTable(
+  inputs:           InvestmentInputs,
+  comparisonAmount: number,
+  rates:            number[] = [4, 6, 8, 10],
+): SensitivityRow[] {
+  return rates.map((rate) => {
+    const result = calculateInvestment({ ...inputs, annualReturn: rate })
+    return {
+      rate,
+      netValue:       Math.round(result.netValue),
+      diff:           Math.round(result.netValue - comparisonAmount),
+      investmentWins: result.netValue > comparisonAmount,
+    }
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Decision matrix
 // ---------------------------------------------------------------------------
 
 export function buildDecisionMatrix(
-  mortgageInterest:   number,
-  mortgageIndexation: number,
+  mortgageInterest:    number,
+  mortgageIndexation:  number,
   investmentNetProfit: number,
 ): DecisionMatrix {
   const mortgageCost   = mortgageInterest + mortgageIndexation
   const investmentGain = Math.max(0, investmentNetProfit)
   const netDiff        = investmentNetProfit - mortgageCost
 
-  // Threshold: ±10% of mortgage cost is considered "close"
   const ratio = mortgageCost > 0 ? Math.abs(netDiff) / mortgageCost : 1
 
   let recommendation: string

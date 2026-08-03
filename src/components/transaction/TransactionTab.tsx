@@ -44,8 +44,7 @@ function NumberInput({
   const handleBlur  = () => {
     setFocused(false)
     const n = parseInt(raw.replace(/\D/g, ''), 10)
-    if (!isNaN(n) && n > 0) onChange(n)
-    else onChange(value)
+    onChange(isNaN(n) ? 0 : n)
   }
 
   return (

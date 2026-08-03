@@ -1,57 +1,107 @@
 /**
- * InvestmentTab — investment calculator.
+ * InvestmentTab — investment vs. mortgage comparison calculator.
  *
  * Layout: split panel (RTL)
- *   Right column → inputs
- *   Left  column → KPI cards + Area chart + comparison summary
+ *   Right column → inputs (mix selector + investment parameters)
+ *   Left  column → outputs (break-even card, KPI row, chart, sensitivity table)
  */
 
 import { useState, useMemo, useCallback } from 'react'
-import { RefreshCw, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, RefreshCw, Info } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
-import { useThemeStore } from '@/store/useThemeStore'
+import { useThemeStore }  from '@/store/useThemeStore'
+import { useMixStore }    from '@/store/useMixStore'
+import { calculateMix }  from '@/engine/calculateMix'
 import {
   calculateInvestment,
+  calcBreakEvenRate,
+  buildSensitivityTable,
 } from '@/engine/calculateInvestment'
-import type { InvestmentInputs } from '@/engine/calculateInvestment'
+import type { InvestmentInputs, SensitivityRow } from '@/engine/calculateInvestment'
+import type { MixId } from '@/types/mix'
 import {
-  MIX_A_COLOR,
+  MIX_A_COLOR, MIX_B_COLOR, MIX_C_COLOR,
   getChartTooltipStyle, getChartAxisStyle,
   CHART_GRID_COLOR_LIGHT, CHART_GRID_COLOR_DARK,
 } from '@/utils/chartTheme'
 import { formatCurrencyWhole, formatNumber } from '@/utils/format'
-import {
-  DEFAULT_EXPECTED_RETURN,
-  DEFAULT_CAPITAL_GAINS_TAX,
-} from '@/utils/constants'
+import { DEFAULT_CAPITAL_GAINS_TAX } from '@/utils/constants'
 
 // ---------------------------------------------------------------------------
-// Default investment inputs
+// Constants
 // ---------------------------------------------------------------------------
+
 const DEFAULT_INPUTS: InvestmentInputs = {
-  initialCapital:  0,
-  monthlyDeposit:  0,
-  years:           20,
-  annualReturn:    0,
-  capitalGainsTax: DEFAULT_CAPITAL_GAINS_TAX,
+  initialCapital:   0,
+  monthlyDeposit:   0,
+  years:            20,
+  annualReturn:     0,
+  capitalGainsTax:  DEFAULT_CAPITAL_GAINS_TAX,
+  managementFeeRate: 0.5,
+}
+
+const SENSITIVITY_RATES = [4, 6, 8, 10]
+
+const MIX_META: { id: MixId; label: string; color: string }[] = [
+  { id: 'a', label: "תמהיל א׳", color: MIX_A_COLOR },
+  { id: 'b', label: "תמהיל ב׳", color: MIX_B_COLOR },
+  { id: 'c', label: "תמהיל ג׳", color: MIX_C_COLOR },
+]
+
+// ---------------------------------------------------------------------------
+// Spitzer savings curve
+// Approximates cumulative interest saved using a fixed 5% rate for curve shape.
+// ---------------------------------------------------------------------------
+function buildSpitzerSavingsCurve(totalSavings: number, years: number): Map<number, number> {
+  const result = new Map<number, number>()
+  if (totalSavings <= 0 || years <= 0) return result
+
+  const N = years * 12
+  const r = 0.05 / 12
+
+  const discountFactor = 1 - Math.pow(1 + r, -N)
+  const paymentFactor  = r / discountFactor
+  const interestFactor = paymentFactor * N - 1
+
+  if (interestFactor <= 0) return result
+
+  const principal      = totalSavings / interestFactor
+  const monthlyPayment = principal * paymentFactor
+
+  let balance            = principal
+  let cumulativeInterest = 0
+
+  for (let m = 1; m <= N; m++) {
+    const interestPmt   = balance * r
+    const principalPmt  = monthlyPayment - interestPmt
+    cumulativeInterest += interestPmt
+    balance             = Math.max(0, balance - principalPmt)
+
+    if (m % 12 === 0) {
+      result.set(m / 12, Math.round(cumulativeInterest))
+    }
+  }
+
+  return result
 }
 
 // ---------------------------------------------------------------------------
-// Labelled number input
+// Sub-components
 // ---------------------------------------------------------------------------
+
 function InputRow({
-  label, value, onChange, min, max, suffix,
+  label, value, onChange, min, max, suffix, disabled,
 }: {
-  label: string
-  value: number
+  label:    string
+  value:    number
   onChange: (v: number) => void
-  min?: number
-  max?: number
-  step?: number
-  suffix?: string
+  min?:     number
+  max?:     number
+  suffix?:  string
+  disabled?: boolean
 }) {
   const [focused, setFocused] = useState(false)
   const [raw, setRaw]         = useState('')
@@ -66,6 +116,7 @@ function InputRow({
           type="text"
           inputMode="decimal"
           placeholder="0"
+          disabled={disabled}
           value={focused ? raw : (value === 0 ? '' : String(value))}
           onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
           onBlur={() => {
@@ -78,7 +129,12 @@ function InputRow({
             onChange(clamped)
           }}
           onChange={(e) => setRaw(e.target.value)}
-          className="flex-1 text-sm rounded-lg border border-gray-200 dark:border-kumu-navy-light bg-transparent text-kumu-navy dark:text-white px-3 py-2 outline-none focus:border-kumu-blue transition-colors"
+          className={[
+            'flex-1 text-sm rounded-lg border bg-transparent px-3 py-2 outline-none transition-colors',
+            disabled
+              ? 'border-gray-100 dark:border-kumu-navy-light/50 text-kumu-navy-light dark:text-kumu-blue-lighter/70 cursor-not-allowed'
+              : 'border-gray-200 dark:border-kumu-navy-light text-kumu-navy dark:text-white focus:border-kumu-blue',
+          ].join(' ')}
         />
         {suffix && (
           <span className="text-xs text-kumu-navy-light dark:text-kumu-blue-lighter w-6 text-center shrink-0">
@@ -90,9 +146,6 @@ function InputRow({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Comparison amount input (₪ prefix, blur-committed)
-// ---------------------------------------------------------------------------
 function ComparisonInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [focused, setFocused] = useState(false)
   const [raw, setRaw]         = useState('')
@@ -100,7 +153,7 @@ function ComparisonInput({ value, onChange }: { value: number; onChange: (v: num
   return (
     <div className="flex flex-col gap-1">
       <label className="text-[10px] font-semibold uppercase tracking-widest text-kumu-navy-light dark:text-kumu-blue-lighter">
-        סכום להשוואה (חסכון במשכנתא)
+        חסכון במשכנתא (הזנה ידנית)
       </label>
       <div className="relative flex items-center">
         <span className="absolute right-3 text-xs text-kumu-navy-light dark:text-kumu-blue-lighter pointer-events-none">
@@ -126,9 +179,6 @@ function ComparisonInput({ value, onChange }: { value: number; onChange: (v: num
   )
 }
 
-// ---------------------------------------------------------------------------
-// Risk disclaimer modal
-// ---------------------------------------------------------------------------
 function RiskModal({ onClose }: { onClose: () => void }) {
   return (
     <div
@@ -164,16 +214,13 @@ function RiskModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// KPI card
-// ---------------------------------------------------------------------------
-function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function KpiCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
   return (
     <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark p-3 flex flex-col gap-1">
       <span className="text-[10px] font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
         {label}
       </span>
-      <span className="text-base font-bold tabular-nums text-kumu-navy dark:text-white">
+      <span className={`text-base font-bold tabular-nums ${accent ?? 'text-kumu-navy dark:text-white'}`}>
         {value}
       </span>
       {sub && (
@@ -185,9 +232,6 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
   )
 }
 
-// ---------------------------------------------------------------------------
-// Custom chart tooltip
-// ---------------------------------------------------------------------------
 function CustomTooltip({
   active, payload, label, isDark,
 }: {
@@ -213,54 +257,132 @@ function CustomTooltip({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Spitzer savings curve — approximates cumulative interest saved over time.
-// Uses a fixed 5% annual rate just to get the Spitzer curve shape, then
-// scales so the final value equals `totalSavings`. Result: Map<year, amount>.
-// ---------------------------------------------------------------------------
-function buildSpitzerSavingsCurve(totalSavings: number, years: number): Map<number, number> {
-  const result = new Map<number, number>()
-  if (totalSavings <= 0 || years <= 0) return result
-
-  const N = years * 12
-  const r = 0.05 / 12  // 5% used only for curve shape
-
-  const discountFactor  = 1 - Math.pow(1 + r, -N)
-  const paymentFactor   = r / discountFactor
-  const interestFactor  = paymentFactor * N - 1  // total interest per ₪ of principal
-
-  if (interestFactor <= 0) return result
-
-  const principal      = totalSavings / interestFactor
-  const monthlyPayment = principal * paymentFactor
-
-  let balance            = principal
-  let cumulativeInterest = 0
-
-  for (let m = 1; m <= N; m++) {
-    const interestPmt   = balance * r
-    const principalPmt  = monthlyPayment - interestPmt
-    cumulativeInterest += interestPmt
-    balance             = Math.max(0, balance - principalPmt)
-
-    if (m % 12 === 0) {
-      result.set(m / 12, Math.round(cumulativeInterest))
-    }
-  }
-
-  return result
+function SensitivityTable({
+  rows,
+  breakEvenRate,
+  isDark,
+}: {
+  rows:          SensitivityRow[]
+  breakEvenRate: number | null
+  isDark:        boolean
+}) {
+  void isDark
+  return (
+    <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100 dark:border-kumu-navy-light flex items-center gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
+          ניתוח רגישות — תשואות שונות
+        </h3>
+        {breakEvenRate !== null && (
+          <span className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter">
+            (שיוויון ב-{breakEvenRate}%)
+          </span>
+        )}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 dark:bg-kumu-navy-dark/50 border-b border-gray-100 dark:border-kumu-navy-light">
+              <th className="text-right px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-kumu-navy-light dark:text-kumu-blue-lighter">
+                תשואה שנתית
+              </th>
+              <th className="text-right px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-kumu-navy-light dark:text-kumu-blue-lighter">
+                ערך תיק נטו
+              </th>
+              <th className="text-right px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-kumu-navy-light dark:text-kumu-blue-lighter">
+                פער מול משכנתא
+              </th>
+              <th className="text-right px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-kumu-navy-light dark:text-kumu-blue-lighter">
+                מי גובר?
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr
+                key={row.rate}
+                className={[
+                  'border-b border-gray-50 dark:border-kumu-navy/50 last:border-0',
+                  row.investmentWins
+                    ? 'bg-emerald-50/50 dark:bg-emerald-900/10'
+                    : 'bg-red-50/30 dark:bg-red-900/5',
+                  i % 2 === 0 ? '' : '',
+                ].join(' ')}
+              >
+                <td className="px-4 py-2.5 tabular-nums font-medium text-kumu-navy dark:text-white">
+                  {row.rate}%
+                </td>
+                <td className="px-4 py-2.5 tabular-nums text-kumu-navy dark:text-white">
+                  {formatCurrencyWhole(row.netValue)}
+                </td>
+                <td className={`px-4 py-2.5 tabular-nums font-medium ${row.investmentWins ? 'text-kumu-green' : 'text-kumu-coral'}`}>
+                  {row.diff >= 0 ? '+' : ''}{formatCurrencyWhole(row.diff)}
+                </td>
+                <td className={`px-4 py-2.5 text-xs font-semibold ${row.investmentWins ? 'text-kumu-green' : 'text-kumu-coral'}`}>
+                  {row.investmentWins ? 'השקעה ✓' : 'משכנתא ✓'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------------------
 // Public component
 // ---------------------------------------------------------------------------
-export function InvestmentTab() {
-  const { theme }  = useThemeStore()
-  const isDark     = theme === 'dark'
 
+export function InvestmentTab() {
+  const { theme } = useThemeStore()
+  const isDark    = theme === 'dark'
+
+  // Mix store
+  const { mixA, mixB, mixC } = useMixStore((s) => ({
+    mixA: s.mixA, mixB: s.mixB, mixC: s.mixC,
+  }))
+
+  // State
+  const [selectedMixId, setSelectedMixId] = useState<MixId>('a')
   const [inputs, setInputs]               = useState<InvestmentInputs>(DEFAULT_INPUTS)
-  const [comparisonAmount, setComparison] = useState(0)
-  const [showRiskModal, setShowRiskModal] = useState(false)
+  const [manualComparison, setManualComparison] = useState(0)
+  const [showRiskModal, setShowRiskModal]  = useState(false)
+
+  // Selected mix
+  const selectedMix = selectedMixId === 'a' ? mixA : selectedMixId === 'b' ? mixB : mixC
+
+  // Compute mix KPIs on-the-fly
+  const mixCalcResult = useMemo(() => {
+    if (!selectedMix.tracks.length) return null
+    try {
+      return calculateMix(selectedMix.tracks, selectedMix.macroForecasts, selectedMix.prepayments)
+    } catch {
+      return null
+    }
+  }, [selectedMix])
+
+  // Auto-derived comparison from mix
+  const autoComparison = mixCalcResult
+    ? mixCalcResult.kpis.totalInterest + mixCalcResult.kpis.totalIndexation
+    : 0
+  const hasAutoComparison = autoComparison > 0
+  const comparisonAmount  = hasAutoComparison ? autoComparison : manualComparison
+  const hasComparison     = comparisonAmount > 0
+
+  // Mix info for display
+  const mixMortgageAmount = selectedMix.globalInputs.mortgageAmount
+  const mixMaxMonths      = selectedMix.tracks.reduce((m, t) => Math.max(m, t.months), 0)
+
+  // Handle mix selection — also auto-sets years from mix term
+  const handleMixSelect = useCallback((id: MixId) => {
+    setSelectedMixId(id)
+    const mix       = id === 'a' ? mixA : id === 'b' ? mixB : mixC
+    const maxMonths = mix.tracks.reduce((m, t) => Math.max(m, t.months), 0)
+    if (maxMonths > 0) {
+      setInputs((prev) => ({ ...prev, years: Math.round(maxMonths / 12) }))
+    }
+  }, [mixA, mixB, mixC])
 
   const update = useCallback(
     <K extends keyof InvestmentInputs>(key: K, value: InvestmentInputs[K]) =>
@@ -273,271 +395,402 @@ export function InvestmentTab() {
     if (v > 0) setShowRiskModal(true)
   }, [update])
 
-  // Investment calculation
+  // Investment result
   const investResult = useMemo(
     () => calculateInvestment(inputs),
     [inputs],
   )
 
-  // Spitzer savings curve
+  // Break-even rate
+  const breakEvenRate = useMemo(
+    () => hasComparison ? calcBreakEvenRate(inputs, comparisonAmount) : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [inputs.initialCapital, inputs.monthlyDeposit, inputs.years,
+     inputs.capitalGainsTax, inputs.managementFeeRate, comparisonAmount, hasComparison],
+  )
+
+  // Sensitivity table
+  const sensitivityRows = useMemo(
+    () => hasComparison ? buildSensitivityTable(inputs, comparisonAmount, SENSITIVITY_RATES) : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [inputs.initialCapital, inputs.monthlyDeposit, inputs.years,
+     inputs.capitalGainsTax, inputs.managementFeeRate, comparisonAmount, hasComparison],
+  )
+
+  // Chart data
   const savingsCurve = useMemo(
     () => buildSpitzerSavingsCurve(comparisonAmount, inputs.years),
     [comparisonAmount, inputs.years],
   )
 
-  // Chart data: portfolio growth + optional savings curve per year
   const chartData = useMemo(
     () => investResult.yearlyPortfolio.map((p) => ({
-      year:           p.year,
-      portfolio:      Math.round(p.value),
-      mortgageSavings: comparisonAmount > 0 ? (savingsCurve.get(p.year) ?? null) : null,
+      year:            p.year,
+      portfolio:       Math.round(p.value),
+      mortgageSavings: hasComparison ? (savingsCurve.get(p.year) ?? null) : null,
     })),
-    [investResult.yearlyPortfolio, savingsCurve, comparisonAmount],
+    [investResult.yearlyPortfolio, savingsCurve, hasComparison],
   )
+
+  // Comparison summary
+  const netDiff   = investResult.netValue - comparisonAmount
+  const CompIcon  = netDiff > 0 ? TrendingUp : netDiff < 0 ? TrendingDown : Minus
+  const compAccent = netDiff > 0
+    ? 'text-kumu-green'
+    : netDiff < 0 ? 'text-kumu-coral' : 'text-kumu-blue'
 
   const axisStyle = getChartAxisStyle(isDark)
   const gridColor = isDark ? CHART_GRID_COLOR_DARK : CHART_GRID_COLOR_LIGHT
 
-  // Comparison summary
-  // Compare total net portfolio value (principal + returns after tax) vs mortgage interest saved
-  const netDiff = investResult.netValue - comparisonAmount
-  const hasComparison = comparisonAmount > 0
-  const CompIcon = netDiff > 0 ? TrendingUp : netDiff < 0 ? TrendingDown : Minus
-  const compAccent = netDiff > 0 ? 'text-kumu-green' : netDiff < 0 ? 'text-kumu-coral' : 'text-kumu-blue'
+  // Recommendation text
+  function getRecommendation(): string {
+    const ratio = comparisonAmount > 0 ? Math.abs(netDiff) / comparisonAmount : 1
+    if (netDiff > 0 && ratio > 0.10) {
+      return 'יתרת תיק ההשקעות צפויה לגבור על סך הריביות שתחסכו במשכנתא — בהנחות הנוכחיות, השקעה בשוק ההון עשויה להיות עדיפה. זכרו: חיסכון הריבית ודאי; תשואות שוק ההון — לא.'
+    }
+    if (netDiff < 0 && ratio > 0.10) {
+      return 'עלות המשכנתא עולה על ערך תיק ההשקעות הצפוי. פירעון מוקדם / הקטנת קרן נותן "תשואה" בטוחה ומובטחת — ללא תנודתיות ושקט נפשי מובנה.'
+    }
+    return 'ההפרש קטן יחסית. ההחלטה תלויה יותר ברמת הסיכון, הנזילות הנדרשת, והשקט הנפשי שמשרה עליכם היד הפנויה.'
+  }
 
   return (
     <>
-    {showRiskModal && <RiskModal onClose={() => setShowRiskModal(false)} />}
-    <div className="flex-1 grid grid-cols-[2fr_3fr] gap-4 p-4 min-h-0 overflow-hidden">
+      {showRiskModal && <RiskModal onClose={() => setShowRiskModal(false)} />}
 
-      {/* ── Inputs column (RIGHT in RTL) ── */}
-      <div className="flex flex-col gap-3 overflow-y-auto">
-        <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
-          {/* Header */}
-          <div className="px-4 py-3 border-b border-gray-100 dark:border-kumu-navy-light">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
-              פרמטרי ההשקעה
-            </h2>
-          </div>
+      <div className="flex-1 grid grid-cols-[2fr_3fr] gap-4 p-4 min-h-0 overflow-hidden">
 
-          <div className="p-4 flex flex-col gap-4">
-            <InputRow
-              label="הון ראשוני (₪)"
-              value={inputs.initialCapital}
-              onChange={(v) => update('initialCapital', v)}
-              min={0}
-              step={10_000}
-            />
-            <InputRow
-              label="הפקדה חודשית (₪)"
-              value={inputs.monthlyDeposit}
-              onChange={(v) => update('monthlyDeposit', v)}
-              min={0}
-              step={500}
-            />
-            <InputRow
-              label="תקופה (שנים)"
-              value={inputs.years}
-              onChange={(v) => update('years', Math.max(1, Math.min(40, v)))}
-              min={1}
-              max={40}
-              step={1}
-            />
-            <InputRow
-              label="תשואה שנתית צפויה"
-              value={inputs.annualReturn}
-              onChange={handleAnnualReturnChange}
-              min={0}
-              max={30}
-              step={0.5}
-              suffix="%"
-            />
-            <InputRow
-              label="מס רווחי הון"
-              value={inputs.capitalGainsTax}
-              onChange={(v) => update('capitalGainsTax', Math.max(0, Math.min(50, v)))}
-              min={0}
-              max={50}
-              step={1}
-              suffix="%"
-            />
+        {/* ── Inputs column (RIGHT in RTL) ── */}
+        <div className="flex flex-col gap-3 overflow-y-auto">
 
-            {/* Reset button */}
-            <button
-              type="button"
-              onClick={() => setInputs(DEFAULT_INPUTS)}
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-kumu-navy-light text-kumu-navy-light dark:text-kumu-blue-lighter text-xs py-2 hover:bg-gray-50 dark:hover:bg-kumu-navy transition-colors"
-            >
-              <RefreshCw size={12} />
-              אפס לברירת מחדל
-            </button>
-
-            {/* Divider */}
-            <div className="h-px bg-gray-100 dark:bg-kumu-navy-light" />
-
-            {/* Comparison amount */}
-            <ComparisonInput value={comparisonAmount} onChange={setComparison} />
-          </div>
-        </div>
-      </div>
-
-      {/* ── Outputs column (LEFT in RTL) ── */}
-      <div className="flex flex-col gap-3 overflow-y-auto">
-
-        {/* 4 KPI cards */}
-        <div className="grid grid-cols-2 gap-2.5">
-          <KpiCard
-            label="שווי ברוטו"
-            value={formatCurrencyWhole(investResult.grossValue)}
-            sub="לפני מס רווחי הון"
-          />
-          <KpiCard
-            label="שווי נטו"
-            value={formatCurrencyWhole(investResult.netValue)}
-            sub="לאחר ניכוי מס"
-          />
-          <KpiCard
-            label="סך הפקדות"
-            value={formatCurrencyWhole(investResult.totalDeposits)}
-            sub="קרן בלבד"
-          />
-          <KpiCard
-            label="רווח נטו"
-            value={formatCurrencyWhole(Math.max(0, investResult.netProfit))}
-            sub="מעבר לקרן, אחרי מס"
-          />
-        </div>
-
-        {/* Area chart */}
-        {chartData.length > 0 && (
+          {/* Mix selector */}
           <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100 dark:border-kumu-navy-light">
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
-                צמיחת תיק ההשקעות לאורך הזמן
-              </h3>
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
+                בחירת תמהיל להשוואה
+              </h2>
             </div>
-            <div className="p-3">
-              <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gradPortfolio" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor={MIX_A_COLOR} stopOpacity={0.18} />
-                      <stop offset="95%" stopColor={MIX_A_COLOR} stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
 
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+            <div className="p-4 flex flex-col gap-3">
+              {/* 3 mix buttons */}
+              <div className="flex gap-1.5">
+                {MIX_META.map(({ id, label }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => handleMixSelect(id)}
+                    className={[
+                      'flex-1 rounded-lg py-2 text-xs font-medium transition-colors',
+                      selectedMixId === id
+                        ? 'bg-kumu-blue text-white'
+                        : 'border border-gray-200 dark:border-kumu-navy-light text-kumu-navy-light dark:text-kumu-blue-lighter hover:border-kumu-blue hover:text-kumu-blue dark:hover:text-kumu-blue-light',
+                    ].join(' ')}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
 
-                  <XAxis
-                    dataKey="year"
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ ...axisStyle, fontSize: 10 }}
-                    tickFormatter={(y: number) => `${y}ש'`}
-                    interval={Math.max(0, Math.floor(chartData.length / 8) - 1)}
-                  />
-
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tick={{ ...axisStyle, fontSize: 10 }}
-                    tickFormatter={(v: number) => `₪${Math.round(v / 1_000)}K`}
-                    width={52}
-                  />
-
-                  <Tooltip
-                    content={(props) => (
-                      <CustomTooltip
-                        active={props.active}
-                        payload={props.payload as unknown as { name: string; value: number; color: string }[]}
-                        label={props.label as number}
-                        isDark={isDark}
-                      />
-                    )}
-                  />
-
-                  <Legend
-                    formatter={(v) => (
-                      <span style={{ fontFamily: 'Heebo, sans-serif', fontSize: 11, color: axisStyle.fill }}>
-                        {v}
+              {/* Mix status */}
+              {hasAutoComparison ? (
+                <div className="flex flex-col gap-2 rounded-lg bg-kumu-blue/5 dark:bg-kumu-blue/10 border border-kumu-blue/15 dark:border-kumu-blue/25 p-3">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-kumu-navy-light dark:text-kumu-blue-lighter">קרן משכנתא</span>
+                    <span className="tabular-nums font-medium text-kumu-navy dark:text-white">
+                      {formatCurrencyWhole(mixMortgageAmount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-kumu-navy-light dark:text-kumu-blue-lighter">סך ריבית + הצמדה</span>
+                    <span className="tabular-nums font-semibold text-kumu-coral">
+                      {formatCurrencyWhole(autoComparison)}
+                    </span>
+                  </div>
+                  {mixMaxMonths > 0 && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-kumu-navy-light dark:text-kumu-blue-lighter">תקופה</span>
+                      <span className="tabular-nums text-kumu-navy dark:text-white">
+                        {Math.round(mixMaxMonths / 12)} שנים
                       </span>
-                    )}
-                  />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-3">
+                  <Info size={13} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700 dark:text-amber-300 leading-snug">
+                    לתמהיל זה אין מסלולים מחושבים. ניתן להזין את חסכון המשכנתא ידנית למטה.
+                  </p>
+                </div>
+              )}
 
-                  <Area
-                    type="monotone"
-                    dataKey="portfolio"
-                    name="ערך תיק (ברוטו)"
-                    stroke={MIX_A_COLOR}
-                    strokeWidth={2.5}
-                    fill="url(#gradPortfolio)"
-                    dot={false}
-                    activeDot={{ r: 4, strokeWidth: 0 }}
-                    isAnimationActive={false}
-                  />
+              {/* Manual comparison input (only when no auto) */}
+              {!hasAutoComparison && (
+                <ComparisonInput value={manualComparison} onChange={setManualComparison} />
+              )}
+            </div>
+          </div>
 
-                  {hasComparison && (
+          {/* Investment parameters */}
+          <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-kumu-navy-light">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
+                פרמטרי ההשקעה
+              </h2>
+            </div>
+
+            <div className="p-4 flex flex-col gap-4">
+              <InputRow
+                label="הון ראשוני (₪)"
+                value={inputs.initialCapital}
+                onChange={(v) => update('initialCapital', v)}
+                min={0}
+              />
+              <InputRow
+                label="הפקדה חודשית (₪)"
+                value={inputs.monthlyDeposit}
+                onChange={(v) => update('monthlyDeposit', v)}
+                min={0}
+              />
+              <InputRow
+                label="תקופה (שנים)"
+                value={inputs.years}
+                onChange={(v) => update('years', Math.max(1, Math.min(40, v)))}
+                min={1}
+                max={40}
+              />
+              <InputRow
+                label="תשואה שנתית צפויה"
+                value={inputs.annualReturn}
+                onChange={handleAnnualReturnChange}
+                min={0}
+                max={30}
+                suffix="%"
+              />
+              <InputRow
+                label="דמי ניהול שנתיים"
+                value={inputs.managementFeeRate ?? 0}
+                onChange={(v) => update('managementFeeRate', Math.max(0, Math.min(5, v)))}
+                min={0}
+                max={5}
+                suffix="%"
+              />
+              <InputRow
+                label="מס רווחי הון"
+                value={inputs.capitalGainsTax}
+                onChange={(v) => update('capitalGainsTax', Math.max(0, Math.min(50, v)))}
+                min={0}
+                max={50}
+                suffix="%"
+              />
+
+              <button
+                type="button"
+                onClick={() => setInputs(DEFAULT_INPUTS)}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-kumu-navy-light text-kumu-navy-light dark:text-kumu-blue-lighter text-xs py-2 hover:bg-gray-50 dark:hover:bg-kumu-navy transition-colors"
+              >
+                <RefreshCw size={12} />
+                אפס לברירת מחדל
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Outputs column (LEFT in RTL) ── */}
+        <div className="flex flex-col gap-3 overflow-y-auto">
+
+          {/* Break-even rate card — only when comparison exists */}
+          {hasComparison && (
+            <div className={[
+              'rounded-xl border p-4 flex items-center gap-4',
+              breakEvenRate === null
+                ? 'bg-red-50 dark:bg-red-900/15 border-red-200 dark:border-red-800'
+                : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700',
+            ].join(' ')}>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-700 dark:text-amber-400 mb-1">
+                  ריבית שיוויון לשנה
+                </p>
+                <p className="text-2xl font-bold tabular-nums text-amber-800 dark:text-amber-300">
+                  {breakEvenRate === null ? 'לא ניתן להשיג' : `${breakEvenRate}%`}
+                </p>
+                <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-1 leading-snug">
+                  {breakEvenRate === null
+                    ? 'גם בתשואה של 100% ההשקעה לא מגיעה לסכום חסכון המשכנתא'
+                    : `תשואה שנתית מינימלית שבה ערך התיק שווה לחסכון במשכנתא`}
+                </p>
+              </div>
+              <div className="text-4xl text-amber-500 dark:text-amber-400 shrink-0">⚖</div>
+            </div>
+          )}
+
+          {/* KPI cards */}
+          {hasComparison ? (
+            <div className="grid grid-cols-3 gap-2.5">
+              <KpiCard
+                label="יתרת תיק נטו"
+                value={formatCurrencyWhole(investResult.netValue)}
+                sub="אחרי מס ודמי ניהול"
+                accent="text-kumu-green"
+              />
+              <KpiCard
+                label="חסכון במשכנתא"
+                value={formatCurrencyWhole(comparisonAmount)}
+                sub={hasAutoComparison ? 'ריבית + הצמדה מהתמהיל' : 'הזנה ידנית'}
+                accent="text-kumu-coral"
+              />
+              <KpiCard
+                label="פער נטו"
+                value={`${netDiff >= 0 ? '+' : ''}${formatCurrencyWhole(netDiff)}`}
+                sub={netDiff >= 0 ? 'השקעה גוברת' : 'משכנתא גוברת'}
+                accent={compAccent}
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5">
+              <KpiCard
+                label="שווי ברוטו"
+                value={formatCurrencyWhole(investResult.grossValue)}
+                sub="לפני מס רווחי הון"
+              />
+              <KpiCard
+                label="שווי נטו"
+                value={formatCurrencyWhole(investResult.netValue)}
+                sub="לאחר מס ודמי ניהול"
+              />
+              <KpiCard
+                label="סך הפקדות"
+                value={formatCurrencyWhole(investResult.totalDeposits)}
+                sub="קרן בלבד"
+              />
+              <KpiCard
+                label="רווח נטו"
+                value={formatCurrencyWhole(Math.max(0, investResult.netProfit))}
+                sub="מעבר לקרן, אחרי מס"
+              />
+            </div>
+          )}
+
+          {/* Area chart */}
+          {chartData.length > 0 && (
+            <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-kumu-navy-light">
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
+                  צמיחת תיק ההשקעות לאורך הזמן
+                </h3>
+              </div>
+              <div className="p-3">
+                <ResponsiveContainer width="100%" height={200}>
+                  <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gradPortfolio" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor={MIX_A_COLOR} stopOpacity={0.18} />
+                        <stop offset="95%" stopColor={MIX_A_COLOR} stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+
+                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+
+                    <XAxis
+                      dataKey="year"
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ ...axisStyle, fontSize: 10 }}
+                      tickFormatter={(y: number) => `${y}ש'`}
+                      interval={Math.max(0, Math.floor(chartData.length / 8) - 1)}
+                    />
+
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tick={{ ...axisStyle, fontSize: 10 }}
+                      tickFormatter={(v: number) => `₪${Math.round(v / 1_000)}K`}
+                      width={52}
+                    />
+
+                    <Tooltip
+                      content={(props) => (
+                        <CustomTooltip
+                          active={props.active}
+                          payload={props.payload as unknown as { name: string; value: number; color: string }[]}
+                          label={props.label as number}
+                          isDark={isDark}
+                        />
+                      )}
+                    />
+
+                    <Legend
+                      formatter={(v) => (
+                        <span style={{ fontFamily: 'Heebo, sans-serif', fontSize: 11, color: axisStyle.fill }}>
+                          {v}
+                        </span>
+                      )}
+                    />
+
                     <Area
                       type="monotone"
-                      dataKey="mortgageSavings"
-                      name="חסכון במשכנתא (משוער)"
-                      stroke="#E87A5D"
-                      strokeWidth={2}
-                      strokeDasharray="6 3"
-                      fill="none"
+                      dataKey="portfolio"
+                      name="ערך תיק (ברוטו)"
+                      stroke={MIX_A_COLOR}
+                      strokeWidth={2.5}
+                      fill="url(#gradPortfolio)"
                       dot={false}
                       activeDot={{ r: 4, strokeWidth: 0 }}
                       isAnimationActive={false}
-                      connectNulls
                     />
-                  )}
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            {hasComparison && (
-              <p className="px-4 pb-3 text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter/80 leading-snug">
-                * החסכון במשכנתא לאורך התקופה הוא אומדן גס המבוסס על לוח שפיצר ואינו מחושב על פי פרמטרי המשכנתא שלכם.
-              </p>
-            )}
-          </div>
-        )}
 
-        {/* Comparison summary — only when comparisonAmount > 0 */}
-        {hasComparison && (
-          <div className="rounded-xl border border-kumu-blue/20 dark:border-kumu-blue/30 bg-kumu-blue/5 dark:bg-kumu-blue/10 overflow-hidden">
-            <div className="px-4 py-3 border-b border-kumu-blue/10 dark:border-kumu-blue/20 flex items-center gap-2">
-              <CompIcon size={15} className={compAccent} />
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
-                מטריצת ההחלטה
-              </h3>
-            </div>
-            <div className="p-4 flex flex-col gap-3">
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter mb-0.5">חסכון במשכנתא</p>
-                  <p className="text-sm font-semibold tabular-nums text-kumu-coral">
-                    {formatCurrencyWhole(comparisonAmount)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter mb-0.5">יתרת תיק נטו</p>
-                  <p className="text-sm font-semibold tabular-nums text-kumu-green">
-                    {formatCurrencyWhole(investResult.netValue)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter mb-0.5">פער נטו</p>
-                  <p className={`text-sm font-semibold tabular-nums ${compAccent}`}>
-                    {netDiff >= 0 ? '+' : ''}{formatCurrencyWhole(netDiff)}
-                  </p>
-                </div>
+                    {hasComparison && (
+                      <Area
+                        type="monotone"
+                        dataKey="mortgageSavings"
+                        name="חסכון במשכנתא (משוער)"
+                        stroke="#E87A5D"
+                        strokeWidth={2}
+                        strokeDasharray="6 3"
+                        fill="none"
+                        dot={false}
+                        activeDot={{ r: 4, strokeWidth: 0 }}
+                        isAnimationActive={false}
+                        connectNulls
+                      />
+                    )}
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
+              {hasComparison && (
+                <p className="px-4 pb-3 text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter/80 leading-snug">
+                  * עקומת החסכון במשכנתא היא אומדן גס המבוסס על לוח שפיצר ב-5% ואינה מחושבת לפי פרמטרי התמהיל שלכם.
+                </p>
+              )}
             </div>
-          </div>
-        )}
+          )}
 
+          {/* Sensitivity table */}
+          {hasComparison && sensitivityRows.length > 0 && (
+            <SensitivityTable
+              rows={sensitivityRows}
+              breakEvenRate={breakEvenRate}
+              isDark={isDark}
+            />
+          )}
+
+          {/* Comparison decision box */}
+          {hasComparison && (
+            <div className="rounded-xl border border-kumu-blue/20 dark:border-kumu-blue/30 bg-kumu-blue/5 dark:bg-kumu-blue/10 overflow-hidden">
+              <div className="px-4 py-3 border-b border-kumu-blue/10 dark:border-kumu-blue/20 flex items-center gap-2">
+                <CompIcon size={15} className={compAccent} />
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
+                  מסקנה
+                </h3>
+              </div>
+              <p className="px-4 py-3 text-sm text-kumu-navy dark:text-white/90 leading-relaxed">
+                {getRecommendation()}
+              </p>
+            </div>
+          )}
+
+        </div>
       </div>
-    </div>
     </>
   )
 }

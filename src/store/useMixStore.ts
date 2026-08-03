@@ -12,9 +12,7 @@ import {
   DEFAULT_ANNUAL_USD_CHANGE,
   DEFAULT_BANK_MARGIN_EUR,
   DEFAULT_BANK_MARGIN_USD,
-  DEFAULT_EQUITY,
   DEFAULT_EURIBOR_RATE,
-  DEFAULT_PROPERTY_VALUE,
   DEFAULT_SOFR_RATE,
 } from '@/utils/constants'
 
@@ -22,10 +20,10 @@ import {
 // Default values
 // ---------------------------------------------------------------------------
 const defaultGlobalInputs: GlobalInputs = {
-  propertyValue:   DEFAULT_PROPERTY_VALUE,
-  equity:          DEFAULT_EQUITY,
+  propertyValue:   0,
+  equity:          0,
   purchaseStatus:  'first',
-  mortgageAmount:  DEFAULT_PROPERTY_VALUE - DEFAULT_EQUITY,
+  mortgageAmount:  0,
 }
 
 const defaultMacroForecasts: MacroForecasts = {
