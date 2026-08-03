@@ -5,6 +5,7 @@ import { DEFAULT_EQUITY, DEFAULT_PROPERTY_VALUE } from '@/utils/constants'
 
 interface TransactionStore extends GlobalInputs {
   update: (partial: Partial<GlobalInputs>) => void
+  reset:  () => void
 }
 
 export const useTransactionStore = create<TransactionStore>()(
@@ -17,6 +18,14 @@ export const useTransactionStore = create<TransactionStore>()(
 
       update: (partial) =>
         set((s) => ({ ...s, ...partial })),
+
+      reset: () =>
+        set({
+          propertyValue:  0,
+          equity:         0,
+          purchaseStatus: 'first',
+          mortgageAmount: 0,
+        }),
     }),
     {
       name: 'kumu-transaction',

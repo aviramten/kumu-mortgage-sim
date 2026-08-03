@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react'
-import { RotateCcw, Plus, X, ArrowLeftRight, FileText } from 'lucide-react'
+import { RotateCcw, Plus, X, ArrowLeftRight, FileText, Trash2 } from 'lucide-react'
 import { useTransactionStore } from '@/store/useTransactionStore'
 import { useCostsStore } from '@/store/useCostsStore'
 import { validateLTV, MAX_LTV } from '@/utils/validation'
@@ -437,19 +437,48 @@ function CostsSection() {
 }
 
 // ---------------------------------------------------------------------------
+// Clear transaction button
+// ---------------------------------------------------------------------------
+function ClearTransactionButton() {
+  const reset         = useTransactionStore((s) => s.reset)
+  const resetAllCosts = useCostsStore((s) => s.resetAll)
+
+  const handleClear = () => {
+    if (!window.confirm('לנקות את כל נתוני העסקה וההוצאות?')) return
+    reset()
+    resetAllCosts()
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClear}
+      title="נקה נתוני עסקה"
+      className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-kumu-navy-light dark:text-kumu-blue-lighter border border-gray-200 dark:border-kumu-navy-light hover:border-kumu-coral hover:text-kumu-coral dark:hover:text-kumu-coral transition-colors"
+    >
+      <Trash2 size={13} />
+      נקה נתוני עסקה
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 export function TransactionTab() {
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-5xl mx-auto mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-9 h-9 rounded-xl bg-kumu-blue/10 dark:bg-kumu-blue/20 flex items-center justify-center">
-            <FileText size={18} className="text-kumu-blue" />
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-kumu-blue/10 dark:bg-kumu-blue/20 flex items-center justify-center">
+              <FileText size={18} className="text-kumu-blue" />
+            </div>
+            <h1 className="text-xl font-semibold text-kumu-navy dark:text-white">
+              נתוני עסקה
+            </h1>
           </div>
-          <h1 className="text-xl font-semibold text-kumu-navy dark:text-white">
-            נתוני עסקה
-          </h1>
+          <ClearTransactionButton />
         </div>
         <p className="text-sm text-kumu-navy-light dark:text-kumu-blue-lighter leading-relaxed">
           הגדירו את פרטי העסקה הבסיסיים כאן — הנתונים זמינים בכל תמהיל כברירת מחדל.

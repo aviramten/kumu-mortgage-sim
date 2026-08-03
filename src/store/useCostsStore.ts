@@ -30,6 +30,8 @@ interface CostsStore {
   updateLabel:  (id: string, label: string) => void
   /** Computed: sum of all row amounts */
   totalCosts:   () => number
+  /** Resets all amounts to 0 and removes custom rows */
+  resetAll:     () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -73,6 +75,9 @@ export const useCostsStore = create<CostsStore>()(
 
       totalCosts: () =>
         get().rows.reduce((sum, r) => sum + (r.amount || 0), 0),
+
+      resetAll: () =>
+        set({ rows: FIXED_ROWS.map((r) => ({ ...r, amount: 0 })) }),
     }),
     {
       name: 'kumu-costs-store',
