@@ -97,11 +97,11 @@ function LTVBadge({ ltv, limit }: { ltv: number; limit: number }) {
 // ---------------------------------------------------------------------------
 function TransactionInputs() {
   const tx = useTransactionStore()
-  const totalCosts = useCostsStore((s) => s.totalCosts)
+  // Subscribe to the computed total directly so re-renders fire when rows change
+  const costs = useCostsStore((s) => s.rows.reduce((sum, r) => sum + (r.amount || 0), 0))
   const [isManual, setIsManual] = useState(false)
 
   const { propertyValue, equity, purchaseStatus, mortgageAmount, update } = tx
-  const costs     = totalCosts()
   const netEquity = equity - costs
   const ltv      = propertyValue > 0 ? (mortgageAmount / propertyValue) * 100 : 0
   const maxLTV   = MAX_LTV[purchaseStatus]
@@ -122,14 +122,18 @@ function TransactionInputs() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [costs])
 
-  // netEquity = equity after deducting all transaction costs
   const autoMortgage = (pv: number, eq: number) => Math.max(0, pv - Math.max(0, eq - costs))
 
-  const setProperty   = (v: number) => {
+  const setProperty  = (v: number) => {
     update({ propertyValue: v, ...(!isManual && { mortgageAmount: autoMortgage(v, equity) }) })
   }
-  const setEquity     = (v: number) => {
+  const setEquity    = (v: number) => {
     update({ equity: v, ...(!isManual && { mortgageAmount: autoMortgage(propertyValue, v) }) })
+  }
+  // Editing net equity reverse-calculates gross equity so the display stays consistent
+  const setNetEquity = (v: number) => {
+    const newEquity = Math.max(0, v + costs)
+    update({ equity: newEquity, ...(!isManual && { mortgageAmount: Math.max(0, propertyValue - v) }) })
   }
   const setMortgage   = (v: number) => { setIsManual(true); update({ mortgageAmount: v }) }
   const resetMortgage = () => {
@@ -159,29 +163,29 @@ function TransactionInputs() {
         </div>
       </div>
 
-      {/* Net equity — read-only derived field */}
+      {/* Net equity — editable; typing here back-calculates gross equity */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-kumu-navy dark:text-kumu-blue-lighter">
-          הון עצמי נטו לאחר ניכוי הוצאות נלוות
-        </span>
-        <div className={[
-          'flex items-center h-9 rounded-xl border px-3',
-          netEquity < 0
-            ? 'border-kumu-error/50 bg-red-50 dark:bg-red-900/10'
-            : 'border-gray-200 dark:border-kumu-navy-light bg-gray-100 dark:bg-kumu-navy/50',
-        ].join(' ')}>
-          <span className="text-sm text-kumu-navy-light dark:text-kumu-blue-lighter ml-1 select-none">₪</span>
-          <span dir="ltr" className={[
-            'flex-1 text-sm font-medium tabular-nums',
-            netEquity < 0 ? 'text-kumu-error' : 'text-kumu-navy dark:text-white',
-          ].join(' ')}>
-            {costs === 0 ? '—' : formatNumber(netEquity)}
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-kumu-navy dark:text-kumu-blue-lighter">
+            הון עצמי נטו לאחר ניכוי הוצאות נלוות
           </span>
           {costs > 0 && (
             <span className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter/70">
               ניכוי ₪{formatNumber(costs)}
             </span>
           )}
+        </div>
+        <div className={[
+          'rounded-xl border bg-gray-50 dark:bg-kumu-navy/30',
+          netEquity < 0 && costs > 0
+            ? 'border-kumu-error/60'
+            : 'border-gray-200 dark:border-kumu-navy-light',
+        ].join(' ')}>
+          <NumberInput
+            value={Math.max(0, netEquity)}
+            onChange={setNetEquity}
+            testId="tx-net-equity"
+          />
         </div>
         {netEquity < 0 && costs > 0 && (
           <p className="text-xs text-kumu-error leading-snug">
