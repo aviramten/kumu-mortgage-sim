@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Info, Plus, Trash2 } from 'lucide-react'
 import { useMix, useMixStore } from '@/store/useMixStore'
 import { calculateMix } from '@/engine/calculateMix'
@@ -46,6 +46,12 @@ function PrepaymentRow({ event, mixId, tracks, estimatedBalance }: PrepaymentRow
   const upd = (partial: Partial<PrepaymentEvent>) =>
     updatePrepayment(mixId, event.id, partial)
 
+  const [monthFocused, setMonthFocused] = useState(false)
+  const [monthRaw,     setMonthRaw]     = useState('')
+
+  const [amountFocused, setAmountFocused] = useState(false)
+  const [amountRaw,     setAmountRaw]     = useState('')
+
   return (
     <div className="flex flex-col gap-2 p-3 rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-gray-50 dark:bg-kumu-navy/30">
 
@@ -58,15 +64,17 @@ function PrepaymentRow({ event, mixId, tracks, estimatedBalance }: PrepaymentRow
           </span>
           <div className="rounded-xl border border-gray-200 dark:border-kumu-navy-light focus-within:border-kumu-blue focus-within:ring-2 focus-within:ring-kumu-blue/20 transition-all">
             <input
-              type="number"
-              value={event.month === 0 ? '' : event.month}
-              min={1}
-              max={360}
-              step={1}
-              onChange={(e) => {
-                const v = parseInt(e.target.value, 10)
-                if (!isNaN(v) && v >= 1 && v <= 360) upd({ month: v })
+              type="text"
+              inputMode="numeric"
+              dir="ltr"
+              value={monthFocused ? monthRaw : (event.month === 0 ? '' : String(event.month))}
+              onFocus={() => { setMonthFocused(true); setMonthRaw(event.month === 0 ? '' : String(event.month)) }}
+              onBlur={() => {
+                setMonthFocused(false)
+                const v = parseInt(monthRaw.replace(/\D/g, ''), 10)
+                if (!isNaN(v) && v >= 1) upd({ month: Math.min(360, v) })
               }}
+              onChange={(e) => setMonthRaw(e.target.value.replace(/\D/g, ''))}
               className={numInputCls}
             />
           </div>
@@ -82,14 +90,17 @@ function PrepaymentRow({ event, mixId, tracks, estimatedBalance }: PrepaymentRow
               ₪
             </span>
             <input
-              type="number"
-              value={event.amount === 0 ? '' : event.amount}
-              min={1000}
-              step={1000}
-              onChange={(e) => {
-                const v = parseInt(e.target.value, 10)
+              type="text"
+              inputMode="numeric"
+              dir="ltr"
+              value={amountFocused ? amountRaw : (event.amount === 0 ? '' : String(event.amount))}
+              onFocus={() => { setAmountFocused(true); setAmountRaw(event.amount === 0 ? '' : String(event.amount)) }}
+              onBlur={() => {
+                setAmountFocused(false)
+                const v = parseInt(amountRaw.replace(/\D/g, ''), 10)
                 if (!isNaN(v) && v > 0) upd({ amount: v })
               }}
+              onChange={(e) => setAmountRaw(e.target.value.replace(/\D/g, ''))}
               className={[numInputCls, 'pl-7'].join(' ')}
             />
           </div>

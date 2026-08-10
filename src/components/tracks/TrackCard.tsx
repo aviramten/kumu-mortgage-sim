@@ -115,6 +115,65 @@ function AmountInput({ value, onChange, hasError = false }: AmountInputProps) {
 }
 
 // ---------------------------------------------------------------------------
+// IntegerInput — free text field for whole-number values (months, grace)
+// ---------------------------------------------------------------------------
+function IntegerInput({ value, onChange, className }: {
+  value: number; onChange: (n: number) => void; className?: string
+}) {
+  const [focused, setFocused] = useState(false)
+  const [raw, setRaw]         = useState('')
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      dir="ltr"
+      value={focused ? raw : (value === 0 ? '' : String(value))}
+      onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
+      onBlur={() => {
+        setFocused(false)
+        const n = parseInt(raw.replace(/\D/g, ''), 10)
+        if (!isNaN(n)) onChange(n)
+      }}
+      onChange={(e) => setRaw(e.target.value.replace(/\D/g, ''))}
+      className={className ?? numInputCls}
+    />
+  )
+}
+
+// ---------------------------------------------------------------------------
+// DecimalInput — free text field for decimal values (rate %), allows "-"
+// ---------------------------------------------------------------------------
+function DecimalInput({ value, onChange, min, max, className }: {
+  value: number; onChange: (n: number) => void; min?: number; max?: number; className?: string
+}) {
+  const [focused, setFocused] = useState(false)
+  const [raw, setRaw]         = useState('')
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      dir="ltr"
+      value={focused ? raw : (value === 0 ? '' : String(value))}
+      onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
+      onBlur={() => {
+        setFocused(false)
+        const n = parseFloat(raw)
+        if (!isNaN(n)) {
+          const clamped = (min !== undefined && n < min) ? min
+            : (max !== undefined && n > max) ? max
+            : n
+          onChange(clamped)
+        }
+      }}
+      onChange={(e) => setRaw(e.target.value)}
+      className={className ?? numInputCls}
+    />
+  )
+}
+
+// ---------------------------------------------------------------------------
 // TrackCard
 // ---------------------------------------------------------------------------
 export interface TrackCardProps {
@@ -250,18 +309,7 @@ export function TrackCard({ track, mixId, index }: TrackCardProps) {
             <div className="flex flex-col gap-1">
               <FieldLabel>תקופה (חודשים)</FieldLabel>
               <ValidationField result={monthsResult}>
-                <input
-                  type="number"
-                  value={track.months === 0 ? '' : track.months}
-                  min={48}
-                  max={360}
-                  step={12}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10)
-                    if (!isNaN(v)) upd({ months: v })
-                  }}
-                  className={numInputCls}
-                />
+                <IntegerInput value={track.months} onChange={(v) => upd({ months: v })} />
               </ValidationField>
             </div>
           </div>
@@ -272,18 +320,12 @@ export function TrackCard({ track, mixId, index }: TrackCardProps) {
               <FieldLabel>ריבית שנתית (%)</FieldLabel>
               <ValidationField result={rateResult}>
                 <div className="relative flex items-center">
-                  <input
-                    type="number"
-                    value={track.annualRate === 0 ? '' : track.annualRate}
+                  <DecimalInput
+                    value={track.annualRate}
+                    onChange={(v) => upd({ annualRate: v })}
                     min={0}
                     max={30}
-                    step={0.05}
-                    onChange={(e) => {
-                      const v = parseFloat(e.target.value)
-                      if (!isNaN(v)) upd({ annualRate: v })
-                    }}
                     className={[numInputCls, 'pr-7'].join(' ')}
-                    dir="ltr"
                   />
                   <span className="absolute right-2.5 text-xs text-kumu-navy-light dark:text-kumu-blue-lighter pointer-events-none select-none">
                     %
@@ -364,18 +406,7 @@ export function TrackCard({ track, mixId, index }: TrackCardProps) {
                           : { status: 'ok' }
                       }
                     >
-                      <input
-                        type="number"
-                        value={track.graceMonths === 0 ? '' : track.graceMonths}
-                        min={1}
-                        max={track.months - 1}
-                        step={1}
-                        onChange={(e) => {
-                          const v = parseInt(e.target.value, 10)
-                          if (!isNaN(v)) upd({ graceMonths: v })
-                        }}
-                        className={numInputCls}
-                      />
+                      <IntegerInput value={track.graceMonths} onChange={(v) => upd({ graceMonths: v })} />
                     </ValidationField>
                   </div>
                 )}

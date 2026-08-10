@@ -41,24 +41,27 @@ interface PercentInputProps {
   max?:     number
 }
 
-function PercentInput({ value, onChange, step = 0.1, min = -20, max = 30 }: PercentInputProps) {
+function PercentInput({ value, onChange, min = -20, max = 30 }: PercentInputProps) {
+  const [focused, setFocused] = useState(false)
+  const [raw, setRaw]         = useState('')
+
   return (
     <div className="relative flex items-center">
       <input
-        type="number"
-        value={value === 0 ? '' : value}
-        step={step}
-        min={min}
-        max={max}
-        onChange={(e) => {
-          const parsed = parseFloat(e.target.value)
-          if (!isNaN(parsed)) onChange(parsed)
+        type="text"
+        inputMode="decimal"
+        dir="ltr"
+        value={focused ? raw : (value === 0 ? '' : String(value))}
+        onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
+        onBlur={() => {
+          setFocused(false)
+          const parsed = parseFloat(raw)
+          if (!isNaN(parsed)) onChange(Math.min(max, Math.max(min, parsed)))
         }}
+        onChange={(e) => setRaw(e.target.value)}
         className={[
           'w-full h-9 rounded-xl bg-transparent pr-3 pl-7 text-sm dir-ltr',
           'text-kumu-navy dark:text-white outline-none',
-          '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none',
-          '[&::-webkit-inner-spin-button]:appearance-none',
         ].join(' ')}
       />
       <span className="absolute left-2.5 text-xs text-kumu-navy-light dark:text-kumu-blue-lighter pointer-events-none select-none">

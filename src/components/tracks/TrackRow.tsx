@@ -166,6 +166,32 @@ function MonthsCell({ value, onChange, hasError }: {
   )
 }
 
+/* ── Rate cell — free text input, allows backspacing to empty / typing "-" ── */
+
+function RateCell({ value, onChange, hasError }: {
+  value: number; onChange: (n: number) => void; hasError?: boolean
+}) {
+  const [focused, setFocused] = useState(false)
+  const [raw, setRaw]         = useState('')
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      dir="ltr"
+      data-testid="track-rate"
+      value={focused ? raw : (value === 0 ? '' : String(value))}
+      onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
+      onBlur={() => {
+        setFocused(false)
+        const n = parseFloat(raw)
+        if (!isNaN(n)) onChange(Math.min(30, Math.max(0, n)))
+      }}
+      onChange={e => setRaw(e.target.value)}
+      className={[I, hasError ? ERR : ''].join(' ')}
+    />
+  )
+}
+
 /* ── Grace column — validates grace < track months ───────────────────────── */
 
 function GraceCell({ track, forGrace, upd }: {
@@ -353,11 +379,10 @@ export function TrackRow({
 
       {/* 7 ── ריבית % */}
       <td className={`${TD} w-[56px]`}>
-        <input
-          type="number" value={track.annualRate === 0 ? '' : track.annualRate} min={0} max={30} step={0.05} dir="ltr"
-          data-testid="track-rate"
-          onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd({ annualRate: v }) }}
-          className={[I, rateErr ? ERR : ''].join(' ')}
+        <RateCell
+          value={track.annualRate}
+          onChange={v => upd({ annualRate: v })}
+          hasError={rateErr}
         />
       </td>
 
