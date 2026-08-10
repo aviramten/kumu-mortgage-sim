@@ -70,6 +70,8 @@ export interface MonthlyRow {
   inflationComponent: number
   totalPayment: number
   closingBalance: number
+  /** One-time lump sum from a prepayment applied this month, included in totalPayment/principalPayment above */
+  prepaymentAmount: number
 }
 
 export interface TrackResult {

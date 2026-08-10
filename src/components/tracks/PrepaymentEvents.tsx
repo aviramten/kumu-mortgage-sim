@@ -19,6 +19,34 @@ function getEstimatedBalance(mixResult: MixResult, trackId: string, month: numbe
 }
 
 // ---------------------------------------------------------------------------
+// Prepayment outcome — what actually changes on the track after this event:
+//  shortenTerm   → the new effective payoff length (all of the track's
+//                  prepayments combined), vs. the originally planned term
+//  reducePayment → the new monthly payment starting the month after the event
+// ---------------------------------------------------------------------------
+function getPrepaymentOutcome(
+  mixResult:      MixResult,
+  event:          PrepaymentEvent,
+  originalMonths: number,
+): string | null {
+  const tr = mixResult.trackResults.find((r) => r.trackId === event.trackId)
+  if (!tr) return null
+
+  if (event.mode === 'shortenTerm') {
+    if (tr.effectiveMonths <= 0 || tr.effectiveMonths >= originalMonths) return null
+    const years  = Math.floor(tr.effectiveMonths / 12)
+    const months = tr.effectiveMonths % 12
+    const periodLabel = months > 0 ? `${years} שנים ו-${months} חודשים` : `${years} שנים`
+    return `המסלול צפוי להסתיים אחרי ${tr.effectiveMonths} חודשים (${periodLabel}) במקום ${originalMonths} חודשים`
+  }
+
+  // reducePayment — the row right after the event month reflects the recalculated PMT
+  const nextRow = tr.rows[event.month]
+  if (!nextRow) return null
+  return `ההחזר החודשי החדש (מהחודש שאחרי הפירעון): ₪${formatNumber(Math.round(nextRow.totalPayment))}`
+}
+
+// ---------------------------------------------------------------------------
 // Shared input class
 // ---------------------------------------------------------------------------
 const numInputCls = [
@@ -37,9 +65,10 @@ interface PrepaymentRowProps {
   mixId:            MixId
   tracks:           { id: string; label: string }[]
   estimatedBalance: number | null
+  outcome:          string | null
 }
 
-function PrepaymentRow({ event, mixId, tracks, estimatedBalance }: PrepaymentRowProps) {
+function PrepaymentRow({ event, mixId, tracks, estimatedBalance, outcome }: PrepaymentRowProps) {
   const updatePrepayment = useMixStore((s) => s.updatePrepayment)
   const removePrepayment = useMixStore((s) => s.removePrepayment)
 
@@ -111,6 +140,13 @@ function PrepaymentRow({ event, mixId, tracks, estimatedBalance }: PrepaymentRow
       {estimatedBalance !== null && (
         <p className="text-[11px] text-kumu-navy-light dark:text-kumu-blue-lighter">
           יתרת קרן משוערת בחודש {event.month}: ₪{formatNumber(Math.round(estimatedBalance))}
+        </p>
+      )}
+
+      {/* Outcome of this prepayment — new term or new monthly payment */}
+      {outcome !== null && (
+        <p className="text-[11px] font-medium text-kumu-green">
+          {outcome}
         </p>
       )}
 
@@ -244,15 +280,19 @@ export function PrepaymentEvents({ mixId }: PrepaymentEventsProps) {
             טרם הוגדרו אירועי פירעון מוקדם.
           </p>
         ) : (
-          prepayments.map((event) => (
-            <PrepaymentRow
-              key={event.id}
-              event={event}
-              mixId={mixId}
-              tracks={trackOptions}
-              estimatedBalance={getEstimatedBalance(mixResult, event.trackId, event.month)}
-            />
-          ))
+          prepayments.map((event) => {
+            const track = tracks.find((t) => t.id === event.trackId)
+            return (
+              <PrepaymentRow
+                key={event.id}
+                event={event}
+                mixId={mixId}
+                tracks={trackOptions}
+                estimatedBalance={getEstimatedBalance(mixResult, event.trackId, event.month)}
+                outcome={track ? getPrepaymentOutcome(mixResult, event, track.months) : null}
+              />
+            )
+          })
         )}
 
         {/* Add event button */}

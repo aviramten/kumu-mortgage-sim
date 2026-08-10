@@ -260,6 +260,7 @@ export function calculateTrack(
 
     // ── 4. Apply prepayment (if any) ──────────────────────────────────────
     const prepayment = findPrepayment(prepayments, month)
+    let prepaymentLump = 0
     if (prepayment && newBalance > 0.005) {
       const balanceBefore = newBalance
 
@@ -277,8 +278,9 @@ export function calculateTrack(
       }
 
       // Add prepayment amount to principal this month
-      principalPayment += balanceBefore - newBalance
-      monthlyTotal     += balanceBefore - newBalance
+      prepaymentLump    = balanceBefore - newBalance
+      principalPayment += prepaymentLump
+      monthlyTotal     += prepaymentLump
     }
 
     // ── 5. Accumulate running totals ──────────────────────────────────────
@@ -296,6 +298,7 @@ export function calculateTrack(
       inflationComponent: roundMoney(inflationComponent),
       totalPayment:       roundMoney(monthlyTotal),
       closingBalance:     roundMoney(newBalance),
+      prepaymentAmount:   roundMoney(prepaymentLump),
     })
 
     // ── 7. Carry unrounded balance ────────────────────────────────────────

@@ -267,9 +267,7 @@ export function MacroForecasts({ mixId }: MacroForecastsProps) {
   const { macroForecasts }   = mix
   const updateMacroForecasts = useMixStore((s) => s.updateMacroForecasts)
 
-  const hasFxTracks      = mix.tracks.some((t) => t.type === 'usd' || t.type === 'eur')
-  const hasMakamTracks   = mix.tracks.some((t) => t.type === 'variable-makam')
-  const hasStationTracks = mix.tracks.some((t) => t.type === 'variable-linked' || t.type === 'variable-unlinked')
+  const hasFxTracks = mix.tracks.some((t) => t.type === 'usd' || t.type === 'eur')
 
   const update = (key: NumericMacroKey, value: number) => {
     updateMacroForecasts(mixId, { [key]: value })
@@ -324,35 +322,27 @@ export function MacroForecasts({ mixId }: MacroForecastsProps) {
             />
           </Section>
 
-          {hasMakamTracks && (
-            <>
-              <div className="h-px bg-gray-100 dark:bg-kumu-navy-light" />
-              <Section title='מק"מ'>
-                <ScheduleField
-                  label='צפי שינוי ריבית מק"מ'
-                  tooltip='לוח שינויים מצטברים בריבית מסלול המק"מ, לפי שנה מיום נטילת ההלוואה. נפרד מלוח הפריים.'
-                  periodLabel="שנה"
-                  points={macroForecasts.makamChangeSchedule}
-                  onChange={(pts) => updateSchedule('makamChangeSchedule', pts)}
-                />
-              </Section>
-            </>
-          )}
+          <div className="h-px bg-gray-100 dark:bg-kumu-navy-light" />
+          <Section title='מק"מ'>
+            <ScheduleField
+              label='צפי שינוי ריבית מק"מ'
+              tooltip='לוח שינויים מצטברים בריבית מסלול המק"מ, לפי שנה מיום נטילת ההלוואה. נפרד מלוח הפריים. רלוונטי רק אם יש מסלול מק"מ בתמהיל.'
+              periodLabel="שנה"
+              points={macroForecasts.makamChangeSchedule}
+              onChange={(pts) => updateSchedule('makamChangeSchedule', pts)}
+            />
+          </Section>
 
-          {hasStationTracks && (
-            <>
-              <div className="h-px bg-gray-100 dark:bg-kumu-navy-light" />
-              <Section title='מסלולים משתנים (מ"צ / מל"צ)'>
-                <ScheduleField
-                  label="צפי שינוי ריבית לפי תחנת עדכון"
-                  tooltip='לוח שינויים מצטברים לפי מספר תחנת העדכון (1 = העדכון הראשון), ולא לפי שנה קלנדרית. רלוונטי למסלולי מ"צ ומל"צ, שמתעדכנים כל תקופת rateChangePeriod של המסלול.'
-                  periodLabel="תחנה"
-                  points={macroForecasts.variableRateChangeSchedule}
-                  onChange={(pts) => updateSchedule('variableRateChangeSchedule', pts)}
-                />
-              </Section>
-            </>
-          )}
+          <div className="h-px bg-gray-100 dark:bg-kumu-navy-light" />
+          <Section title='מסלולים משתנים (מ"צ / מל"צ)'>
+            <ScheduleField
+              label="צפי שינוי ריבית לפי תחנת עדכון"
+              tooltip='לוח שינויים מצטברים לפי מספר תחנת העדכון (1 = העדכון הראשון), ולא לפי שנה קלנדרית. רלוונטי למסלולי מ"צ ומל"צ, שמתעדכנים כל תקופת rateChangePeriod של המסלול.'
+              periodLabel="תחנה"
+              points={macroForecasts.variableRateChangeSchedule}
+              onChange={(pts) => updateSchedule('variableRateChangeSchedule', pts)}
+            />
+          </Section>
 
           <div className="h-px bg-gray-100 dark:bg-kumu-navy-light" />
 

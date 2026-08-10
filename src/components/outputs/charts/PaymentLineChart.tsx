@@ -93,12 +93,15 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
     [mix.tracks, mix.macroForecasts, mix.prepayments],
   )
 
-  // Aggregate monthly totals across all tracks
+  // Aggregate monthly totals across all tracks — excludes one-time prepayment
+  // lump sums, which represent a payoff event rather than the regular
+  // recurring payment this chart is meant to show.
   const chartData = useMemo(() => {
     const map = new Map<number, number>()
     for (const tr of result.trackResults) {
       for (const row of tr.rows) {
-        map.set(row.month, (map.get(row.month) ?? 0) + row.totalPayment)
+        const regularPayment = row.totalPayment - row.prepaymentAmount
+        map.set(row.month, (map.get(row.month) ?? 0) + regularPayment)
       }
     }
     return Array.from(map.entries())
