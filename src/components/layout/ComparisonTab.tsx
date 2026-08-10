@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react'
 import { useMix } from '@/store/useMixStore'
 import { calculateMix } from '@/engine/calculateMix'
 import { ComparisonChart } from '@/components/outputs/charts/ComparisonChart'
+import { ComparisonBalanceChart } from '@/components/outputs/charts/ComparisonBalanceChart'
 import { formatCurrencyWhole, formatNumber } from '@/utils/format'
 import { MIX_A_COLOR, MIX_B_COLOR, MIX_C_COLOR } from '@/utils/chartTheme'
 import type { MixId } from '@/types/mix'
@@ -51,33 +52,6 @@ const KPI_ROWS: KpiRowDef[] = [
     format: (v: number) => `${formatNumber(Math.round(v * 100) / 100)} ₪`,
   },
 ]
-
-// ---------------------------------------------------------------------------
-// Summary builder — KUMU tone
-// ---------------------------------------------------------------------------
-function buildSummary(
-  selected: MixMeta[],
-  kpisMap: Map<MixId, MixKPIs>,
-): string {
-  if (selected.length < 2) {
-    return 'בחרו לפחות שני תמהילים כדי לראות השוואה משמעותית.'
-  }
-
-  const costs = selected.map((m) => ({ label: m.label, cost: kpisMap.get(m.id)!.totalCost }))
-  costs.sort((a, b) => a.cost - b.cost)
-
-  const cheapest = costs[0]
-  const priciest = costs[costs.length - 1]
-  const diff     = priciest.cost - cheapest.cost
-  const pctDiff  = priciest.cost > 0 ? diff / priciest.cost : 0
-
-  if (pctDiff < 0.01) {
-    return 'התמהילים הנבחרים דומים מאוד בעלות הכוללת. ההחלטה ביניהם תלויה יותר ברמת הסיכון ובגמישות שאתם מחפשים.'
-  }
-
-  const savings = formatCurrencyWhole(diff)
-  return `${cheapest.label} חוסך ${savings} לאורך כל חיי המשכנתא לעומת ${priciest.label}. שווה לבחון מה מייצר את ההפרש הזה לפני שמחליטים.`
-}
 
 // ---------------------------------------------------------------------------
 // Mix selector checkboxes
@@ -200,7 +174,6 @@ export function ComparisonTab() {
     color:  m.color,
   }))
 
-  const summary = buildSummary(activeMixes, kpisMap)
   const hasData = activeMixes.length >= 1 && activeMixes.every((m) => resultMap.get(m.id)!.trackResults.length > 0)
 
   return (
@@ -252,6 +225,20 @@ export function ComparisonTab() {
               </div>
               <div className="p-3">
                 <ComparisonChart entries={chartEntries} />
+              </div>
+            </div>
+          )}
+
+          {/* Comparison balance chart */}
+          {activeMixes.length >= 2 && (
+            <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-kumu-navy-light">
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
+                  יתרת הקרן לאורך הזמן
+                </h3>
+              </div>
+              <div className="p-3">
+                <ComparisonBalanceChart entries={chartEntries} />
               </div>
             </div>
           )}
@@ -343,16 +330,6 @@ export function ComparisonTab() {
                 })}
               </tbody>
             </table>
-          </div>
-
-          {/* Summary block */}
-          <div className="rounded-xl border border-kumu-blue/20 dark:border-kumu-blue/30 bg-kumu-blue/5 dark:bg-kumu-blue/10 p-5">
-            <p className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter mb-2">
-              סיכום
-            </p>
-            <p className="text-sm text-kumu-navy dark:text-white leading-relaxed">
-              {summary}
-            </p>
           </div>
         </>
       )}

@@ -338,10 +338,12 @@ export function InvestmentTab() {
   const { theme } = useThemeStore()
   const isDark    = theme === 'dark'
 
-  // Mix store
-  const { mixA, mixB, mixC } = useMixStore((s) => ({
-    mixA: s.mixA, mixB: s.mixB, mixC: s.mixC,
-  }))
+  // Mix store — select each field individually; a selector returning a new
+  // object literal breaks Zustand's reference-equality check and causes an
+  // infinite render loop ("Maximum update depth exceeded" / React error #185).
+  const mixA = useMixStore((s) => s.mixA)
+  const mixB = useMixStore((s) => s.mixB)
+  const mixC = useMixStore((s) => s.mixC)
 
   // State
   const [selectedMixId, setSelectedMixId] = useState<MixId>('a')

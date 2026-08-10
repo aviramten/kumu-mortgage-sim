@@ -6,9 +6,12 @@ import type { IncomeRow, LiabilityRow } from '@/types/affordability'
 // Fixed income rows
 // ---------------------------------------------------------------------------
 const FIXED_INCOME_ROWS: IncomeRow[] = [
-  { id: 'payslip1',   label: 'תלוש 1',                              amount: 0, isFixed: true },
-  { id: 'payslip2',   label: 'תלוש 2',                              amount: 0, isFixed: true },
-  { id: 'payslip3',   label: 'תלוש 3',                              amount: 0, isFixed: true },
+  { id: 'payslip1',    label: 'תלוש 1 — שכיר/ה 1',                   amount: 0, isFixed: true },
+  { id: 'payslip2',    label: 'תלוש 2 — שכיר/ה 1',                   amount: 0, isFixed: true },
+  { id: 'payslip3',    label: 'תלוש 3 — שכיר/ה 1',                   amount: 0, isFixed: true },
+  { id: 'payslip1b',   label: 'תלוש 1 — שכיר/ה 2',                   amount: 0, isFixed: true },
+  { id: 'payslip2b',   label: 'תלוש 2 — שכיר/ה 2',                   amount: 0, isFixed: true },
+  { id: 'payslip3b',   label: 'תלוש 3 — שכיר/ה 2',                   amount: 0, isFixed: true },
   { id: 'rental1',    label: 'נכס מניב 1',                          amount: 0, isFixed: true },
   { id: 'rental2',    label: 'נכס מניב 2',                          amount: 0, isFixed: true },
   { id: 'tax-assess', label: 'הכנסה חודשית נטו משומת מס',           amount: 0, isFixed: true },
@@ -133,6 +136,25 @@ export const useAffordabilityStore = create<AffordabilityStore>()(
       name: 'kumu-affordability-store',
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({ incomeRows: s.incomeRows, liabilityRows: s.liabilityRows }),
+      // v1: added a second earner's payslip rows (payslip1b/2b/3b). Merge old
+      // persisted amounts into the new fixed-row set instead of resetting.
+      version: 1,
+      migrate: (persisted, version) => {
+        if (version < 1) {
+          const old = persisted as { incomeRows?: IncomeRow[]; liabilityRows?: LiabilityRow[] }
+          const oldIncomeById = new Map((old.incomeRows ?? []).map((r) => [r.id, r]))
+          const mergedIncomeRows = FIXED_INCOME_ROWS.map((r) => {
+            const existing = oldIncomeById.get(r.id)
+            return existing ? { ...r, amount: existing.amount } : r
+          })
+          const customIncomeRows = (old.incomeRows ?? []).filter((r) => !r.isFixed)
+          return {
+            incomeRows:    [...mergedIncomeRows, ...customIncomeRows],
+            liabilityRows: old.liabilityRows ?? FIXED_LIABILITY_ROWS,
+          }
+        }
+        return persisted as { incomeRows: IncomeRow[]; liabilityRows: LiabilityRow[] }
+      },
     }
   )
 )

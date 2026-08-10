@@ -100,7 +100,7 @@ function AmountInput({ value, onChange, hasError = false }: AmountInputProps) {
         type="text"
         inputMode="numeric"
         dir="ltr"
-        value={focused ? raw : formatNumber(Math.round(value))}
+        value={focused ? raw : (value === 0 ? '' : formatNumber(Math.round(value)))}
         onFocus={handleFocus}
         onBlur={handleBlur}
         onChange={(e) => setRaw(e.target.value.replace(/\D/g, ''))}
@@ -159,7 +159,7 @@ export function TrackCard({ track, mixId, index }: TrackCardProps) {
       ? 'חודשי הגרייס חייבים להיות בין 1 לתקופת המסלול'
       : undefined
 
-  const shortLabel = TRACK_TYPE_OPTIONS.find((o) => o.value === track.type)?.short ?? track.type
+  const shortLabel = TRACK_TYPE_OPTIONS.find((o) => o.value === track.type)?.short || 'בחר מסלול'
   const hasError   = amountResult.status === 'error' || monthsResult.status === 'error' || rateResult.status === 'error'
 
   return (
@@ -225,6 +225,9 @@ export function TrackCard({ track, mixId, index }: TrackCardProps) {
               onChange={(e) => handleTypeChange(e.target.value as TrackType)}
               className={selectCls}
             >
+              {track.type === '' && (
+                <option value="" disabled>בחר מסלול</option>
+              )}
               {TRACK_TYPE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
@@ -249,7 +252,7 @@ export function TrackCard({ track, mixId, index }: TrackCardProps) {
               <ValidationField result={monthsResult}>
                 <input
                   type="number"
-                  value={track.months}
+                  value={track.months === 0 ? '' : track.months}
                   min={48}
                   max={360}
                   step={12}
@@ -271,7 +274,7 @@ export function TrackCard({ track, mixId, index }: TrackCardProps) {
                 <div className="relative flex items-center">
                   <input
                     type="number"
-                    value={track.annualRate}
+                    value={track.annualRate === 0 ? '' : track.annualRate}
                     min={0}
                     max={30}
                     step={0.05}
@@ -303,7 +306,7 @@ export function TrackCard({ track, mixId, index }: TrackCardProps) {
           </div>
 
           {/* Rate change period — variable-linked and variable-unlinked only */}
-          {VARIABLE_TYPES.includes(track.type) && (
+          {track.type !== '' && VARIABLE_TYPES.includes(track.type) && (
             <div className="flex flex-col gap-1">
               <FieldLabel>תדירות שינוי ריבית</FieldLabel>
               <select
@@ -363,7 +366,7 @@ export function TrackCard({ track, mixId, index }: TrackCardProps) {
                     >
                       <input
                         type="number"
-                        value={track.graceMonths}
+                        value={track.graceMonths === 0 ? '' : track.graceMonths}
                         min={1}
                         max={track.months - 1}
                         step={1}

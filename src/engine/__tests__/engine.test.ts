@@ -15,16 +15,18 @@ import type { MacroForecasts }  from '@/types/macro'
 // Shared macro fixture with zero prime-change (not relevant for these tests)
 // ---------------------------------------------------------------------------
 const MACRO_ZERO_CPI: MacroForecasts = {
-  annualCPI:           0,
-  annualPrimeChange:   0,
-  annualUSDChange:     0,
-  annualEURChange:     0,
-  sofrRate:            3.6,
-  euriborRate:         2.75,
-  bankMarginUSD:       2.5,
-  bankMarginEUR:       2.5,
-  annualSOFRChange:    0,
-  annualEURIBORChange: 0,
+  annualCPI:                  0,
+  primeChangeSchedule:        [],
+  makamChangeSchedule:        [],
+  variableRateChangeSchedule: [],
+  annualUSDChange:            0,
+  annualEURChange:            0,
+  sofrRate:                   3.6,
+  euriborRate:                2.75,
+  bankMarginUSD:              2.5,
+  bankMarginEUR:              2.5,
+  annualSOFRChange:           0,
+  annualEURIBORChange:        0,
 }
 
 const MACRO_2_5_CPI: MacroForecasts = {
@@ -207,16 +209,18 @@ describe('Test #3 — CPI-indexed Spitzer (fixed-linked, CPI = 2.5 %)', () => {
 // Additional macro fixture with 2.5% CPI and rate data for FX/grace tests
 // ---------------------------------------------------------------------------
 const MACRO_FULL: MacroForecasts = {
-  annualCPI:           2.5,
-  annualPrimeChange:   0,
-  annualUSDChange:     3.0,   // USD appreciates 3% / yr vs ILS
-  annualEURChange:     0,
-  sofrRate:            3.6,
-  euriborRate:         2.75,
-  bankMarginUSD:       2.5,
-  bankMarginEUR:       2.5,
-  annualSOFRChange:    0,
-  annualEURIBORChange: 0,
+  annualCPI:                  2.5,
+  primeChangeSchedule:        [],
+  makamChangeSchedule:        [],
+  variableRateChangeSchedule: [],
+  annualUSDChange:            3.0,   // USD appreciates 3% / yr vs ILS
+  annualEURChange:            0,
+  sofrRate:                   3.6,
+  euriborRate:                2.75,
+  bankMarginUSD:              2.5,
+  bankMarginEUR:              2.5,
+  annualSOFRChange:           0,
+  annualEURIBORChange:        0,
 }
 
 // ---------------------------------------------------------------------------

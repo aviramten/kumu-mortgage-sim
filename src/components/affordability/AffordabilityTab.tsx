@@ -225,7 +225,7 @@ function LiabilitiesSection() {
           יתרת חוב
         </span>
         <span className="text-[10px] font-semibold uppercase tracking-widest text-kumu-navy-light dark:text-kumu-blue-lighter text-right">
-          יתרת תקופה
+          יתרת תקופה (חודשים)
         </span>
         <span />
       </div>

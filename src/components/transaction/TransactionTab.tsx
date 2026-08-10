@@ -57,7 +57,7 @@ function NumberInput({
         inputMode="numeric"
         dir="ltr"
         data-testid={testId}
-        value={focused ? raw : formatNumber(Math.round(value))}
+        value={focused ? raw : (value === 0 ? '' : formatNumber(Math.round(value)))}
         onFocus={handleFocus}
         onBlur={handleBlur}
         onChange={(e) => setRaw(e.target.value.replace(/\D/g, ''))}

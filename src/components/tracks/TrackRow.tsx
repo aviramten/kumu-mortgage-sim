@@ -93,7 +93,7 @@ function PctCell({
       inputMode="decimal"
       dir="ltr"
       title="הזן אחוז מסכום המשכנתא — הסכום יחושב אוטומטית"
-      value={focused ? raw : pct.toFixed(1)}
+      value={focused ? raw : (pct === 0 ? '' : pct.toFixed(1))}
       onFocus={() => { setFocused(true); setRaw(pct.toFixed(2)) }}
       onBlur={() => {
         setFocused(false)
@@ -125,7 +125,7 @@ function AmountCell({ value, onChange, hasError }: {
       inputMode="numeric"
       dir="ltr"
       data-testid="track-amount"
-      value={focused ? raw : formatNumber(Math.round(value))}
+      value={focused ? raw : (value === 0 ? '' : formatNumber(Math.round(value)))}
       onFocus={() => { setFocused(true); setRaw(String(Math.round(value))) }}
       onBlur={() => {
         setFocused(false)
@@ -152,7 +152,7 @@ function MonthsCell({ value, onChange, hasError }: {
       dir="ltr"
       data-testid="track-months"
       title="יש להזין את התקופה במספר חודשים. לדוגמה: 25 שנים = 300 חודשים"
-      value={focused ? raw : String(value)}
+      value={focused ? raw : (value === 0 ? '' : String(value))}
       onFocus={() => { setFocused(true); setRaw(String(value)) }}
       onBlur={() => {
         setFocused(false)
@@ -233,7 +233,7 @@ export function TrackRow({
   const rateErr = validateAnnualRate(track.annualRate).status === 'error'
   const hasErr  = amtErr || monErr || rateErr
 
-  const isPeriodType    = PERIOD_TYPES.includes(track.type)
+  const isPeriodType    = track.type !== '' && PERIOD_TYPES.includes(track.type)
   const scheduleDisplay = getScheduleDisplay(track)
 
   const handleTypeChange = (type: TrackType) => {
@@ -301,6 +301,9 @@ export function TrackRow({
       {/* 2 ── מסלול */}
       <td className={`${TD} w-[84px]`}>
         <select value={track.type} onChange={e => handleTypeChange(e.target.value as TrackType)} className={S}>
+          {track.type === '' && (
+            <option value="" disabled>בחר מסלול</option>
+          )}
           {TRACK_TYPE_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
@@ -351,7 +354,7 @@ export function TrackRow({
       {/* 7 ── ריבית % */}
       <td className={`${TD} w-[56px]`}>
         <input
-          type="number" value={track.annualRate} min={0} max={30} step={0.05} dir="ltr"
+          type="number" value={track.annualRate === 0 ? '' : track.annualRate} min={0} max={30} step={0.05} dir="ltr"
           data-testid="track-rate"
           onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd({ annualRate: v }) }}
           className={[I, rateErr ? ERR : ''].join(' ')}

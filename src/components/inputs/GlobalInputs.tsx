@@ -59,7 +59,7 @@ function NumberInput({ value, onChange, placeholder, hasError = false, testId }:
         inputMode="numeric"
         dir="ltr"
         data-testid={testId}
-        value={focused ? raw : formatNumber(Math.round(value))}
+        value={focused ? raw : (value === 0 ? '' : formatNumber(Math.round(value)))}
         onFocus={handleFocus}
         onBlur={handleBlur}
         onChange={handleChange}
@@ -187,10 +187,10 @@ export function GlobalInputs({ mixId }: GlobalInputsProps) {
                 mortgageAmount: tx.mortgageAmount,
               })}
               className="flex items-center gap-1 text-[11px] text-kumu-blue hover:text-kumu-blue-light transition-colors"
-              title="אפס לנתונים הכלליים"
+              title="עדכן מהנתונים הכלליים"
             >
               <RefreshCw size={11} />
-              אפס
+              עדכן
             </button>
           </div>
         )}

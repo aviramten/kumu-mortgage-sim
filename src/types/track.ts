@@ -32,7 +32,8 @@ export type RateChangePeriod = 18 | 24 | 36 | 60 | 84 | 120
 // ---------------------------------------------------------------------------
 export interface LoanTrack {
   id: string
-  type: TrackType
+  /** '' means the user has not yet chosen a track type — excluded from calculations */
+  type: TrackType | ''
   amount: number                 // ₪, integer, ≥ 10,000
   months: number                 // 48–360, integer
   annualRate: number             // % annual

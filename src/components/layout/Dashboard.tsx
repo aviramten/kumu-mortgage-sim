@@ -72,13 +72,15 @@ function PTIBadge({ mixId, dispIncome }: { mixId: MixId; dispIncome: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// Duplicate-mix dropdown — small button per mix tab
+// Duplicate-mix dropdown — small button per mix tab.
+// Imports data FROM another mix INTO the currently open mix (overwriting it),
+// matching the direction of the empty-state "שכפל מ..." flow.
 // ---------------------------------------------------------------------------
 interface DuplicateDropdownProps {
-  sourceMixId: MixId
+  currentMixId: MixId
 }
 
-function DuplicateDropdown({ sourceMixId }: DuplicateDropdownProps) {
+function DuplicateDropdown({ currentMixId }: DuplicateDropdownProps) {
   const [open, setOpen] = useState(false)
   const ref             = useRef<HTMLDivElement>(null)
   const { duplicateMix } = useMixStore()
@@ -101,18 +103,20 @@ function DuplicateDropdown({ sourceMixId }: DuplicateDropdownProps) {
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  const targets: MixId[] = (['a', 'b', 'c'] as MixId[]).filter((id) => id !== sourceMixId)
+  const sources: MixId[] = (['a', 'b', 'c'] as MixId[]).filter(
+    (id) => id !== currentMixId && hasTracks[id],
+  )
 
-  const handleDuplicate = (targetId: MixId) => {
-    const targetLabel = MIX_LABELS[targetId]
-    const sourceLabel = MIX_LABELS[sourceMixId]
-    if (hasTracks[targetId]) {
-      const confirmed = window.confirm(
-        `כדי לשכפל את ${sourceLabel} אל ${targetLabel}, הנתונים הקיימים ב${targetLabel} יימחקו. להמשיך?`
-      )
-      if (!confirmed) { setOpen(false); return }
-    }
-    duplicateMix(sourceMixId, targetId)
+  if (sources.length === 0) return null
+
+  const handleImport = (sourceId: MixId) => {
+    const sourceLabel  = MIX_LABELS[sourceId]
+    const currentLabel = MIX_LABELS[currentMixId]
+    const confirmed = window.confirm(
+      `הנתונים הקיימים ב${currentLabel} יוחלפו בנתוני ${sourceLabel}. להמשיך?`
+    )
+    if (!confirmed) { setOpen(false); return }
+    duplicateMix(sourceId, currentMixId)
     setOpen(false)
   }
 
@@ -124,28 +128,23 @@ function DuplicateDropdown({ sourceMixId }: DuplicateDropdownProps) {
         className="flex items-center gap-1.5 h-7 px-3 rounded-lg border border-gray-200 dark:border-kumu-navy-light text-kumu-navy-light dark:text-kumu-blue-lighter text-xs font-medium hover:bg-gray-50 dark:hover:bg-kumu-navy hover:text-kumu-navy dark:hover:text-white transition-colors"
       >
         <Copy size={12} />
-        שכפל תמהיל
+        ייבוא מתמהיל אחר
         <ChevronDown size={11} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
         <div className="absolute top-full mt-1.5 right-0 bg-white dark:bg-kumu-surface-dark border border-gray-100 dark:border-kumu-navy-light rounded-xl shadow-lg z-20 min-w-[180px] overflow-hidden">
           <p className="px-3 pt-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-kumu-navy-light dark:text-kumu-blue-lighter border-b border-gray-100 dark:border-kumu-navy-light">
-            שמור עותק ב...
+            טען נתונים מ...
           </p>
-          {targets.map((targetId) => (
+          {sources.map((sourceId) => (
             <button
-              key={targetId}
+              key={sourceId}
               type="button"
-              onClick={() => handleDuplicate(targetId)}
+              onClick={() => handleImport(sourceId)}
               className="w-full flex items-center justify-between px-3 py-2.5 text-xs text-kumu-navy dark:text-white hover:bg-kumu-blue/5 dark:hover:bg-kumu-blue/10 transition-colors"
             >
-              <span>{MIX_LABELS[targetId]}</span>
-              {hasTracks[targetId] && (
-                <span className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter">
-                  (ידרוס)
-                </span>
-              )}
+              <span>{MIX_LABELS[sourceId]}</span>
             </button>
           ))}
         </div>
@@ -191,7 +190,7 @@ function MixTabContent({ mixId }: { mixId: MixId }) {
       {/* ── Toolbar ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-end gap-2">
         <ClearMixButton mixId={mixId} />
-        <DuplicateDropdown sourceMixId={mixId} />
+        <DuplicateDropdown currentMixId={mixId} />
       </div>
 
       {/* ── Row 1: Global inputs (RIGHT in RTL) + KPI summary (LEFT) ────── */}

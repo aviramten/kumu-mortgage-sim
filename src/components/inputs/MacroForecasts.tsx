@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { useMixStore, useMix } from '@/store/useMixStore'
-import { validateCPI, validatePrimeChange, validateFXChange } from '@/utils/validation'
+import { validateCPI, validateFXChange } from '@/utils/validation'
 import type { ValidationResult } from '@/utils/validation'
 import type { MixId } from '@/types/mix'
-import type { MacroForecasts as MacroForecastsType } from '@/types/macro'
+import type { MacroForecasts as MacroForecastsType, RateSchedulePoint } from '@/types/macro'
+import { RateScheduleEditor } from './RateScheduleEditor'
 
 // ---------------------------------------------------------------------------
 // Info tooltip
@@ -45,7 +46,7 @@ function PercentInput({ value, onChange, step = 0.1, min = -20, max = 30 }: Perc
     <div className="relative flex items-center">
       <input
         type="number"
-        value={value}
+        value={value === 0 ? '' : value}
         step={step}
         min={min}
         max={max}
@@ -70,8 +71,13 @@ function PercentInput({ value, onChange, step = 0.1, min = -20, max = 30 }: Perc
 // ---------------------------------------------------------------------------
 // Single macro field row
 // ---------------------------------------------------------------------------
+type NumericMacroKey = Exclude<
+  keyof MacroForecastsType,
+  'primeChangeSchedule' | 'makamChangeSchedule' | 'variableRateChangeSchedule'
+>
+
 interface FieldConfig {
-  key:       keyof MacroForecastsType
+  key:       NumericMacroKey
   label:     string
   tooltip:   string
   validate?: (v: number) => ValidationResult
@@ -133,6 +139,33 @@ function MacroField({
 }
 
 // ---------------------------------------------------------------------------
+// ScheduleField — a rate-change schedule (prime / makam / variable-station)
+// ---------------------------------------------------------------------------
+function ScheduleField({
+  label,
+  tooltip,
+  periodLabel,
+  points,
+  onChange,
+}: {
+  label:       string
+  tooltip:     string
+  periodLabel: string
+  points:      RateSchedulePoint[]
+  onChange:    (points: RateSchedulePoint[]) => void
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-kumu-navy dark:text-kumu-blue-lighter">{label}</span>
+        <InfoTooltip text={tooltip} />
+      </div>
+      <RateScheduleEditor points={points} onChange={onChange} periodLabel={periodLabel} />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Field sections config
 // ---------------------------------------------------------------------------
 const SECTION_LOCAL: FieldConfig[] = [
@@ -142,13 +175,6 @@ const SECTION_LOCAL: FieldConfig[] = [
     tooltip:  'שינוי שנתי צפוי במדד המחירים לצרכן. משפיע ישירות על מסלולים צמודי מדד.',
     validate: validateCPI,
     step: 0.1, min: -5, max: 20,
-  },
-  {
-    key:      'annualPrimeChange',
-    label:    'צפי שינוי ריבית הפריים',
-    tooltip:  'שינוי שנתי צפוי בריבית בנק ישראל. ריבית הפריים = ריבית בנק ישראל + 1.5%.',
-    validate: validatePrimeChange,
-    step: 0.25, min: -3, max: 10,
   },
 ]
 
@@ -238,10 +264,19 @@ export function MacroForecasts({ mixId }: MacroForecastsProps) {
   const { macroForecasts }   = mix
   const updateMacroForecasts = useMixStore((s) => s.updateMacroForecasts)
 
-  const hasFxTracks = mix.tracks.some((t) => t.type === 'usd' || t.type === 'eur')
+  const hasFxTracks      = mix.tracks.some((t) => t.type === 'usd' || t.type === 'eur')
+  const hasMakamTracks   = mix.tracks.some((t) => t.type === 'variable-makam')
+  const hasStationTracks = mix.tracks.some((t) => t.type === 'variable-linked' || t.type === 'variable-unlinked')
 
-  const update = (key: keyof MacroForecastsType, value: number) => {
+  const update = (key: NumericMacroKey, value: number) => {
     updateMacroForecasts(mixId, { [key]: value })
+  }
+
+  const updateSchedule = (
+    key:    'primeChangeSchedule' | 'makamChangeSchedule' | 'variableRateChangeSchedule',
+    points: RateSchedulePoint[],
+  ) => {
+    updateMacroForecasts(mixId, { [key]: points })
   }
 
   const renderField = (cfg: FieldConfig) => (
@@ -277,7 +312,44 @@ export function MacroForecasts({ mixId }: MacroForecastsProps) {
         <div className="flex flex-col gap-5 px-4 pb-4 border-t border-gray-100 dark:border-kumu-navy-light pt-4">
           <Section title="כלכלה מקומית">
             {SECTION_LOCAL.map(renderField)}
+            <ScheduleField
+              label="צפי שינוי ריבית הפריים"
+              tooltip='לוח שינויים מצטברים בריבית בנק ישראל, לפי שנה מיום נטילת ההלוואה. ריבית הפריים = ריבית בנק ישראל + 1.5%. הערך נשאר קבוע בין נקודות ומחזיק את הערך האחרון לאחר הנקודה האחרונה.'
+              periodLabel="שנה"
+              points={macroForecasts.primeChangeSchedule}
+              onChange={(pts) => updateSchedule('primeChangeSchedule', pts)}
+            />
           </Section>
+
+          {hasMakamTracks && (
+            <>
+              <div className="h-px bg-gray-100 dark:bg-kumu-navy-light" />
+              <Section title='מק"מ'>
+                <ScheduleField
+                  label='צפי שינוי ריבית מק"מ'
+                  tooltip='לוח שינויים מצטברים בריבית מסלול המק"מ, לפי שנה מיום נטילת ההלוואה. נפרד מלוח הפריים.'
+                  periodLabel="שנה"
+                  points={macroForecasts.makamChangeSchedule}
+                  onChange={(pts) => updateSchedule('makamChangeSchedule', pts)}
+                />
+              </Section>
+            </>
+          )}
+
+          {hasStationTracks && (
+            <>
+              <div className="h-px bg-gray-100 dark:bg-kumu-navy-light" />
+              <Section title='מסלולים משתנים (מ"צ / מל"צ)'>
+                <ScheduleField
+                  label="צפי שינוי ריבית לפי תחנת עדכון"
+                  tooltip='לוח שינויים מצטברים לפי מספר תחנת העדכון (1 = העדכון הראשון), ולא לפי שנה קלנדרית. רלוונטי למסלולי מ"צ ומל"צ, שמתעדכנים כל תקופת rateChangePeriod של המסלול.'
+                  periodLabel="תחנה"
+                  points={macroForecasts.variableRateChangeSchedule}
+                  onChange={(pts) => updateSchedule('variableRateChangeSchedule', pts)}
+                />
+              </Section>
+            </>
+          )}
 
           <div className="h-px bg-gray-100 dark:bg-kumu-navy-light" />
 

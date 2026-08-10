@@ -82,17 +82,31 @@ export const validateCPI = (value: number): ValidationResult =>
     },
   ])
 
-export const validatePrimeChange = (value: number): ValidationResult =>
+// ---------------------------------------------------------------------------
+// Rate-change schedule validations (prime / makam / variable-station tables)
+// ---------------------------------------------------------------------------
+
+/** period must be a positive integer (year number or station number) */
+export const validateSchedulePeriod = (value: number, label: string): ValidationResult =>
   validateField(value, [
     {
-      check:   (v) => v < -3 || v > 10,
+      check:   (v) => !Number.isInteger(v) || v < 1,
       status:  'error',
-      message: 'שינוי ריבית הפריים חורג מהטווח הפיזי הסביר',
+      message: `${label} חייבת להיות מספר שלם חיובי`,
+    },
+  ])
+
+export const validateCumulativeDelta = (value: number): ValidationResult =>
+  validateField(value, [
+    {
+      check:   (v) => v < -15 || v > 20,
+      status:  'error',
+      message: 'הדלתא המצטברת חורגת מהטווח הפיזי הסביר',
     },
     {
-      check:   (v) => v < -1 || v > 3,
+      check:   (v) => v < -7 || v > 8,
       status:  'warning',
-      message: 'שינוי ריבית הפריים חורג מהטווח הסביר (−1% עד +3%) — שווה לוודא שזה הערך המכוון',
+      message: 'הדלתא המצטברת חורגת מהטווח הסביר — שווה לוודא שזה הערך המכוון',
     },
   ])
 

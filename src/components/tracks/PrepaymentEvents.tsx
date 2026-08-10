@@ -1,8 +1,22 @@
+import { useMemo } from 'react'
 import { Info, Plus, Trash2 } from 'lucide-react'
 import { useMix, useMixStore } from '@/store/useMixStore'
+import { calculateMix } from '@/engine/calculateMix'
 import { formatNumber } from '@/utils/format'
 import type { PrepaymentEvent, PrepaymentMode } from '@/types/track'
 import type { MixId } from '@/types/mix'
+import type { MixResult } from '@/types/calculation'
+
+// ---------------------------------------------------------------------------
+// Estimated balance lookup — the track's projected opening balance at the
+// event's month, per the mix's current calculation (other prepayments included)
+// ---------------------------------------------------------------------------
+function getEstimatedBalance(mixResult: MixResult, trackId: string, month: number): number | null {
+  const tr = mixResult.trackResults.find((r) => r.trackId === trackId)
+  if (!tr || tr.rows.length === 0) return null
+  const row = tr.rows.find((r) => r.month === month) ?? tr.rows[tr.rows.length - 1]
+  return row.openingBalance
+}
 
 // ---------------------------------------------------------------------------
 // Shared input class
@@ -19,12 +33,13 @@ const numInputCls = [
 // PrepaymentRow — a single prepayment event
 // ---------------------------------------------------------------------------
 interface PrepaymentRowProps {
-  event:  PrepaymentEvent
-  mixId:  MixId
-  tracks: { id: string; label: string }[]
+  event:            PrepaymentEvent
+  mixId:            MixId
+  tracks:           { id: string; label: string }[]
+  estimatedBalance: number | null
 }
 
-function PrepaymentRow({ event, mixId, tracks }: PrepaymentRowProps) {
+function PrepaymentRow({ event, mixId, tracks, estimatedBalance }: PrepaymentRowProps) {
   const updatePrepayment = useMixStore((s) => s.updatePrepayment)
   const removePrepayment = useMixStore((s) => s.removePrepayment)
 
@@ -44,7 +59,7 @@ function PrepaymentRow({ event, mixId, tracks }: PrepaymentRowProps) {
           <div className="rounded-xl border border-gray-200 dark:border-kumu-navy-light focus-within:border-kumu-blue focus-within:ring-2 focus-within:ring-kumu-blue/20 transition-all">
             <input
               type="number"
-              value={event.month}
+              value={event.month === 0 ? '' : event.month}
               min={1}
               max={360}
               step={1}
@@ -68,7 +83,7 @@ function PrepaymentRow({ event, mixId, tracks }: PrepaymentRowProps) {
             </span>
             <input
               type="number"
-              value={event.amount}
+              value={event.amount === 0 ? '' : event.amount}
               min={1000}
               step={1000}
               onChange={(e) => {
@@ -80,6 +95,13 @@ function PrepaymentRow({ event, mixId, tracks }: PrepaymentRowProps) {
           </div>
         </div>
       </div>
+
+      {/* Estimated balance at this month, for reference */}
+      {estimatedBalance !== null && (
+        <p className="text-[11px] text-kumu-navy-light dark:text-kumu-blue-lighter">
+          יתרת קרן משוערת בחודש {event.month}: ₪{formatNumber(Math.round(estimatedBalance))}
+        </p>
+      )}
 
       {/* Row 2: Track selector */}
       <div className="flex flex-col gap-1">
@@ -151,8 +173,13 @@ interface PrepaymentEventsProps {
 }
 
 export function PrepaymentEvents({ mixId }: PrepaymentEventsProps) {
-  const { tracks, prepayments } = useMix(mixId)
-  const addPrepayment           = useMixStore((s) => s.addPrepayment)
+  const { tracks, prepayments, macroForecasts } = useMix(mixId)
+  const addPrepayment                           = useMixStore((s) => s.addPrepayment)
+
+  const mixResult = useMemo(
+    () => calculateMix(tracks, macroForecasts, prepayments),
+    [tracks, macroForecasts, prepayments],
+  )
 
   // Build labelled list for the track selector inside each row
   const trackOptions = tracks.map((t, idx) => {
@@ -212,6 +239,7 @@ export function PrepaymentEvents({ mixId }: PrepaymentEventsProps) {
               event={event}
               mixId={mixId}
               tracks={trackOptions}
+              estimatedBalance={getEstimatedBalance(mixResult, event.trackId, event.month)}
             />
           ))
         )}

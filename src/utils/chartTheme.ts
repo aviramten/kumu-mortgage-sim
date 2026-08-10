@@ -11,6 +11,7 @@ import type { LoanTrack } from '@/types/track'
 // Per-track-type palette (9 tracks)
 // ---------------------------------------------------------------------------
 export const KUMU_CHART_COLORS: Record<LoanTrack['type'], string> = {
+  '':                  '#9CA3AF', // gray — track type not yet chosen
   'prime':             '#3B5BDB', // kumu-blue        — פריים
   'fixed-unlinked':    '#5B7BFF', // kumu-blue-light  — קל"צ
   'fixed-linked':      '#A5B8FF', // kumu-blue-lighter — ק"צ

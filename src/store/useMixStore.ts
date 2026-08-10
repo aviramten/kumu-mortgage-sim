@@ -7,7 +7,6 @@ import {
   DEFAULT_ANNUAL_CPI,
   DEFAULT_ANNUAL_EUR_CHANGE,
   DEFAULT_ANNUAL_EURIBOR_CHANGE,
-  DEFAULT_ANNUAL_PRIME_CHANGE,
   DEFAULT_ANNUAL_SOFR_CHANGE,
   DEFAULT_ANNUAL_USD_CHANGE,
   DEFAULT_BANK_MARGIN_EUR,
@@ -26,23 +25,28 @@ const defaultGlobalInputs: GlobalInputs = {
   mortgageAmount:  0,
 }
 
-const defaultMacroForecasts: MacroForecasts = {
-  annualCPI:            DEFAULT_ANNUAL_CPI,
-  annualPrimeChange:    DEFAULT_ANNUAL_PRIME_CHANGE,
-  annualUSDChange:      DEFAULT_ANNUAL_USD_CHANGE,
-  annualEURChange:      DEFAULT_ANNUAL_EUR_CHANGE,
-  sofrRate:             DEFAULT_SOFR_RATE,
-  euriborRate:          DEFAULT_EURIBOR_RATE,
-  bankMarginUSD:        DEFAULT_BANK_MARGIN_USD,
-  bankMarginEUR:        DEFAULT_BANK_MARGIN_EUR,
-  annualSOFRChange:     DEFAULT_ANNUAL_SOFR_CHANGE,
-  annualEURIBORChange:  DEFAULT_ANNUAL_EURIBOR_CHANGE,
-}
+// A function (not a shared constant) so every mix gets its own fresh
+// schedule arrays — sharing array references across mixes would let an
+// edit to one mix's schedule mutate another's.
+const createDefaultMacroForecasts = (): MacroForecasts => ({
+  annualCPI:                  DEFAULT_ANNUAL_CPI,
+  primeChangeSchedule:        [],
+  makamChangeSchedule:        [],
+  variableRateChangeSchedule: [],
+  annualUSDChange:            DEFAULT_ANNUAL_USD_CHANGE,
+  annualEURChange:            DEFAULT_ANNUAL_EUR_CHANGE,
+  sofrRate:                   DEFAULT_SOFR_RATE,
+  euriborRate:                DEFAULT_EURIBOR_RATE,
+  bankMarginUSD:              DEFAULT_BANK_MARGIN_USD,
+  bankMarginEUR:              DEFAULT_BANK_MARGIN_EUR,
+  annualSOFRChange:           DEFAULT_ANNUAL_SOFR_CHANGE,
+  annualEURIBORChange:        DEFAULT_ANNUAL_EURIBOR_CHANGE,
+})
 
 const createDefaultMix = (id: MixId): Mix => ({
   id,
   globalInputs:   { ...defaultGlobalInputs },
-  macroForecasts: { ...defaultMacroForecasts },
+  macroForecasts: createDefaultMacroForecasts(),
   tracks:         [],
   prepayments:    [],
   results:        null,
@@ -132,7 +136,7 @@ export const useMixStore = create<MixStore>()(
       const mix   = state[key]
       const newTrack: LoanTrack = {
         id:                   crypto.randomUUID(),
-        type:                 'prime',
+        type:                 '',
         amount:               0,
         months:               0,
         annualRate:           0,
@@ -264,6 +268,15 @@ export const useMixStore = create<MixStore>()(
       storage: createJSONStorage(() => localStorage),
       // Persist only data (mixA, mixB, mixC), not action functions
       partialize: (state) => ({ mixA: state.mixA, mixB: state.mixB, mixC: state.mixC }),
+      // v1: macroForecasts replaced annualPrimeChange (a single number) with
+      // schedule arrays. Old persisted shapes are incompatible — reset to defaults.
+      version: 1,
+      migrate: (_persisted, version) => {
+        if (version < 1) {
+          return { mixA: createDefaultMix('a'), mixB: createDefaultMix('b'), mixC: createDefaultMix('c') }
+        }
+        return _persisted as MixStore
+      },
     }
   )
 )

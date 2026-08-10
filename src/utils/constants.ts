@@ -2,7 +2,6 @@
 
 // Macro forecasts
 export const DEFAULT_ANNUAL_CPI = 2.5;          // % — Bank of Israel forecast
-export const DEFAULT_ANNUAL_PRIME_CHANGE = 0;   // % — no change assumed
 export const DEFAULT_ANNUAL_USD_CHANGE = 0;     // % — stable USD/ILS
 export const DEFAULT_ANNUAL_EUR_CHANGE = 0;     // % — stable EUR/ILS
 

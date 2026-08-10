@@ -79,6 +79,7 @@ function buildMonthlyRows(
     for (const row of tr.rows) {
       const existing = map.get(row.month)
       if (existing) {
+        existing.openingBalance     += row.openingBalance
         existing.principalPayment   += row.principalPayment
         existing.interestPayment    += row.interestPayment
         existing.inflationComponent += row.inflationComponent
@@ -407,11 +408,6 @@ export function AmortizationTable({ mixId }: AmortizationTableProps) {
                           {row.isPrepayment && (
                             <span className="mr-1 text-[9px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded px-1 py-0.5">
                               פירעון
-                            </span>
-                          )}
-                          {row.isRateChange && !row.isPrepayment && (
-                            <span className="mr-1 text-[9px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded px-1 py-0.5">
-                              תחנה
                             </span>
                           )}
                         </td>

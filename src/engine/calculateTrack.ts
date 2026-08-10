@@ -11,7 +11,7 @@
  */
 
 import type { LoanTrack, PrepaymentEvent, MonthlyRow, TrackResult } from '@/types/track'
-import type { MacroForecasts } from '@/types/macro'
+import type { MacroForecasts, RateSchedulePoint } from '@/types/macro'
 import { roundMoney } from '@/utils/format'
 import {
   applyPartialGrace,
@@ -60,10 +60,32 @@ function rateChangePeriodFor(track: LoanTrack): number | null {
 }
 
 /**
+ * Cumulative delta at a given period index, per a step-function schedule.
+ *
+ * Returns the cumulativeDelta of the latest point whose `period` is ≤
+ * periodIndex, or 0 if no such point exists (before the first scheduled
+ * change). No interpolation — the delta jumps at each defined period and
+ * holds flat afterward, including past the last defined point.
+ */
+function cumulativeDeltaAt(schedule: RateSchedulePoint[], periodIndex: number): number {
+  let result = 0
+  let bestPeriod = -Infinity
+  for (const point of schedule) {
+    if (point.period <= periodIndex && point.period > bestPeriod) {
+      bestPeriod = point.period
+      result = point.cumulativeDelta
+    }
+  }
+  return result
+}
+
+/**
  * Effective annual rate at a given 1-based month.
  *
  * For FX tracks, delegates to fxEffectiveRate.
- * For variable shekel tracks, the rate increments by annualPrimeChange per year elapsed.
+ * For variable shekel tracks, the rate is offset by the cumulative delta
+ * from the relevant schedule (prime / makam by year elapsed, variable-linked
+ * and variable-unlinked by update-station index).
  */
 function effectiveAnnualRate(
   track: LoanTrack,
@@ -78,8 +100,13 @@ function effectiveAnnualRate(
   if (period === null) return track.annualRate
 
   const periodsElapsed = Math.floor((month - 1) / period)
-  const yearsElapsed   = periodsElapsed * (period / 12)
-  return track.annualRate + yearsElapsed * macro.annualPrimeChange
+
+  const schedule =
+    track.type === 'prime'          ? macro.primeChangeSchedule :
+    track.type === 'variable-makam' ? macro.makamChangeSchedule :
+    macro.variableRateChangeSchedule
+
+  return track.annualRate + cumulativeDeltaAt(schedule, periodsElapsed)
 }
 
 // ---------------------------------------------------------------------------

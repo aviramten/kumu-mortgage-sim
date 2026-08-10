@@ -16,6 +16,7 @@ import { calculateTrack }                  from './calculateTrack'
 // ---------------------------------------------------------------------------
 function isCalculable(t: LoanTrack): boolean {
   return (
+    t.type      !== ''    &&
     t.amount    >= 10_000 &&
     t.months    >= 48     &&
     t.months    <= 360    &&
