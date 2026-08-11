@@ -61,10 +61,13 @@ export function calculateMix(
   })
 
   // ── Aggregate monthly totals ─────────────────────────────────────────────
+  // Excludes one-time prepayment lump sums — a prepayment is not a recurring
+  // monthly payment, so it must not count toward firstPayment/maxPayment.
   const monthTotals = new Map<number, number>()
   for (const result of trackResults) {
     for (const row of result.rows) {
-      monthTotals.set(row.month, (monthTotals.get(row.month) ?? 0) + row.totalPayment)
+      const regularPayment = row.totalPayment - row.prepaymentAmount
+      monthTotals.set(row.month, (monthTotals.get(row.month) ?? 0) + regularPayment)
     }
   }
 
