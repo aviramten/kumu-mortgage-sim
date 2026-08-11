@@ -31,10 +31,13 @@ export interface ComparisonEntry {
 function buildComparisonData(entries: ComparisonEntry[]) {
   const maps: Map<number, number>[] = entries.map(() => new Map())
 
+  // Exclude one-time prepayment lump sums — this chart is meant to show the
+  // recurring monthly payment, not a cash-flow spike from a payoff event.
   entries.forEach(({ result }, i) => {
     for (const tr of result.trackResults) {
       for (const row of tr.rows) {
-        maps[i].set(row.month, (maps[i].get(row.month) ?? 0) + row.totalPayment)
+        const regularPayment = row.totalPayment - row.prepaymentAmount
+        maps[i].set(row.month, (maps[i].get(row.month) ?? 0) + regularPayment)
       }
     }
   })
