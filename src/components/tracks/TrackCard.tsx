@@ -84,7 +84,7 @@ function AmountInput({ value, onChange, hasError = false }: AmountInputProps) {
   const [focused, setFocused] = useState(false)
   const [raw, setRaw]         = useState('')
 
-  const handleFocus = () => { setFocused(true); setRaw(String(Math.round(value))) }
+  const handleFocus = () => { setFocused(true); setRaw(value === 0 ? '' : String(Math.round(value))) }
   const handleBlur  = () => {
     setFocused(false)
     const parsed = parseInt(raw.replace(/\D/g, ''), 10)

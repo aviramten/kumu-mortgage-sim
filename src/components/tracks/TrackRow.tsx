@@ -3,7 +3,7 @@ import { Trash2, Banknote } from 'lucide-react'
 import { useMixStore } from '@/store/useMixStore'
 import { validateTrackAmount, validateTrackMonths, validateAnnualRate } from '@/utils/validation'
 import { formatNumber, formatCurrencyWhole, roundMoney } from '@/utils/format'
-import { MAX_LOAN_MONTHS } from '@/utils/constants'
+import { MIN_LOAN_MONTHS, MAX_LOAN_MONTHS } from '@/utils/constants'
 import type { LoanTrack, TrackType, GraceType, RateChangePeriod, TrackResult } from '@/types/track'
 import type { MacroForecasts } from '@/types/macro'
 import type { MixId } from '@/types/mix'
@@ -94,7 +94,7 @@ function PctCell({
       dir="ltr"
       title="הזן אחוז מסכום המשכנתא — הסכום יחושב אוטומטית"
       value={focused ? raw : (pct === 0 ? '' : pct.toFixed(1))}
-      onFocus={() => { setFocused(true); setRaw(pct.toFixed(2)) }}
+      onFocus={() => { setFocused(true); setRaw(pct === 0 ? '' : pct.toFixed(2)) }}
       onBlur={() => {
         setFocused(false)
         const p = parseFloat(raw.replace(/[^\d.]/g, ''))
@@ -126,7 +126,7 @@ function AmountCell({ value, onChange, hasError }: {
       dir="ltr"
       data-testid="track-amount"
       value={focused ? raw : (value === 0 ? '' : formatNumber(Math.round(value)))}
-      onFocus={() => { setFocused(true); setRaw(String(Math.round(value))) }}
+      onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(Math.round(value))) }}
       onBlur={() => {
         setFocused(false)
         const n = parseInt(raw.replace(/\D/g, ''), 10)
@@ -153,11 +153,11 @@ function MonthsCell({ value, onChange, hasError }: {
       data-testid="track-months"
       title="יש להזין את התקופה במספר חודשים. לדוגמה: 25 שנים = 300 חודשים"
       value={focused ? raw : (value === 0 ? '' : String(value))}
-      onFocus={() => { setFocused(true); setRaw(String(value)) }}
+      onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
       onBlur={() => {
         setFocused(false)
         const n = parseInt(raw.replace(/\D/g, ''), 10)
-        if (!isNaN(n) && n >= 1) onChange(Math.min(MAX_LOAN_MONTHS, n))
+        if (!isNaN(n) && n >= 1) onChange(Math.min(MAX_LOAN_MONTHS, Math.max(MIN_LOAN_MONTHS, n)))
         else onChange(value) // revert on empty/invalid
       }}
       onChange={e => setRaw(e.target.value.replace(/\D/g, ''))}
@@ -372,7 +372,14 @@ export function TrackRow({
       <td className={`${TD} w-[52px]`}>
         <MonthsCell
           value={track.months}
-          onChange={v => upd({ months: v })}
+          onChange={v => {
+            const isStandardGrace = track.graceType === 'partial' || track.graceType === 'full'
+            const patch: Partial<LoanTrack> = { months: v }
+            if (isStandardGrace && track.graceMonths >= v) {
+              patch.graceMonths = Math.max(0, v - 1)
+            }
+            upd(patch)
+          }}
           hasError={monErr}
         />
       </td>

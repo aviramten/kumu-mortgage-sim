@@ -88,8 +88,6 @@ function formatCell(key: keyof MixSummary, value: number): string {
 }
 
 function SummaryTable({ summaries }: { summaries: MixSummary[] }) {
-  const hasB = summaries.length > 1
-
   return (
     <table className="w-full text-right" style={{ fontFamily: 'Heebo, sans-serif' }}>
       <thead>
@@ -140,16 +138,6 @@ function SummaryTable({ summaries }: { summaries: MixSummary[] }) {
                 const isPerShekel = row.key === 'perShekel'
                 const isTotal     = row.key === 'total'
 
-                /* For comparison: flag which mix is cheaper */
-                const otherVal = hasB
-                  ? (s.label === summaries[0].label
-                    ? summaries[1][row.key]
-                    : summaries[0][row.key]) as number
-                  : null
-                const isBetter = hasB && otherVal !== null
-                  ? (isPerShekel || isTotal ? val < otherVal : val < otherVal)
-                  : false
-
                 return (
                   <td
                     key={s.label}
@@ -163,13 +151,9 @@ function SummaryTable({ summaries }: { summaries: MixSummary[] }) {
                         : isTotal
                           ? 'text-kumu-navy dark:text-white'
                           : 'text-kumu-navy dark:text-kumu-blue-lighter/80',
-                      isBetter ? 'relative' : '',
                     ].join(' ')}
                   >
-                    {isBetter && (
-                      <span className="absolute inset-x-1 inset-y-0.5 rounded bg-emerald-50 dark:bg-emerald-900/20 pointer-events-none" />
-                    )}
-                    <span className="relative">{formatCell(row.key, val)}</span>
+                    {formatCell(row.key, val)}
                   </td>
                 )
               })}
@@ -182,56 +166,42 @@ function SummaryTable({ summaries }: { summaries: MixSummary[] }) {
 }
 
 // ---------------------------------------------------------------------------
+// Mix label lookup
+// ---------------------------------------------------------------------------
+const MIX_LABELS: Record<MixId, string> = {
+  a: "תמהיל א'",
+  b: "תמהיל ב'",
+  c: "תמהיל ג'",
+}
+
+// ---------------------------------------------------------------------------
 // Public component
 // ---------------------------------------------------------------------------
 interface CostBreakdownBarsProps {
   mixId: MixId
 }
 
-export function CostBreakdownBars({ mixId: _mixId }: CostBreakdownBarsProps) {
-  const mixA   = useMix('a')
-  const mixB   = useMix('b')
+export function CostBreakdownBars({ mixId }: CostBreakdownBarsProps) {
+  const mix    = useMix(mixId)
   const { theme } = useThemeStore()
   const isDark = theme === 'dark'
 
-  const resultA = useMemo(
-    () => calculateMix(mixA.tracks, mixA.macroForecasts, mixA.prepayments),
+  const result = useMemo(
+    () => calculateMix(mix.tracks, mix.macroForecasts, mix.prepayments),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mixA.tracks, mixA.macroForecasts, mixA.prepayments],
+    [mix.tracks, mix.macroForecasts, mix.prepayments],
   )
 
-  const resultB = useMemo(
-    () => mixB.tracks.length > 0
-      ? calculateMix(mixB.tracks, mixB.macroForecasts, mixB.prepayments)
-      : null,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mixB.tracks, mixB.macroForecasts, mixB.prepayments],
-  )
+  const principal = mix.tracks.reduce((s, t) => s + t.amount, 0)
 
-  const principalA = mixA.tracks.reduce((s, t) => s + t.amount, 0)
-  const principalB = mixB.tracks.reduce((s, t) => s + t.amount, 0)
-
-  const summaries = useMemo<MixSummary[]>(() => {
-    const rows: MixSummary[] = [{
-      label:      "תמהיל א'",
-      principal:  principalA,
-      interest:   resultA.kpis.totalInterest,
-      indexation: resultA.kpis.totalIndexation,
-      total:      resultA.kpis.totalCost,
-      perShekel:  principalA > 0 ? resultA.kpis.totalCost / principalA : 0,
-    }]
-    if (resultB) {
-      rows.push({
-        label:      "תמהיל ב'",
-        principal:  principalB,
-        interest:   resultB.kpis.totalInterest,
-        indexation: resultB.kpis.totalIndexation,
-        total:      resultB.kpis.totalCost,
-        perShekel:  principalB > 0 ? resultB.kpis.totalCost / principalB : 0,
-      })
-    }
-    return rows
-  }, [principalA, principalB, resultA.kpis, resultB])
+  const summaries = useMemo<MixSummary[]>(() => [{
+    label:      MIX_LABELS[mixId],
+    principal,
+    interest:   result.kpis.totalInterest,
+    indexation: result.kpis.totalIndexation,
+    total:      result.kpis.totalCost,
+    perShekel:  principal > 0 ? result.kpis.totalCost / principal : 0,
+  }], [mixId, principal, result.kpis])
 
   const barData = useMemo<BarRow[]>(() => summaries.map((s) => ({
     name:       s.label,
@@ -243,7 +213,7 @@ export function CostBreakdownBars({ mixId: _mixId }: CostBreakdownBarsProps) {
   const axisStyle = getChartAxisStyle(isDark)
   const gridColor = isDark ? CHART_GRID_COLOR_DARK : CHART_GRID_COLOR_LIGHT
 
-  const isEmpty = resultA.trackResults.length === 0
+  const isEmpty = result.trackResults.length === 0
 
   return (
     <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
@@ -276,7 +246,7 @@ export function CostBreakdownBars({ mixId: _mixId }: CostBreakdownBarsProps) {
                 <BarChart
                   data={barData}
                   margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
-                  barSize={resultB ? 44 : 60}
+                  barSize={60}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"

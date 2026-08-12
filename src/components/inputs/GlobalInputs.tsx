@@ -34,7 +34,7 @@ function NumberInput({ value, onChange, placeholder, hasError = false, testId }:
 
   const handleFocus = () => {
     setFocused(true)
-    setRaw(String(Math.round(value)))
+    setRaw(value === 0 ? '' : String(Math.round(value)))
   }
 
   const handleBlur = () => {

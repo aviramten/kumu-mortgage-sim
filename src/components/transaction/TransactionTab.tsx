@@ -41,7 +41,7 @@ function NumberInput({
   const [focused, setFocused] = useState(false)
   const [raw, setRaw]         = useState('')
 
-  const handleFocus = () => { setFocused(true); setRaw(String(Math.round(value))) }
+  const handleFocus = () => { setFocused(true); setRaw(value === 0 ? '' : String(Math.round(value))) }
   const handleBlur  = () => {
     setFocused(false)
     const n = parseInt(raw.replace(/\D/g, ''), 10)

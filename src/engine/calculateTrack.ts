@@ -151,8 +151,14 @@ export function calculateTrack(
 
   // -- Grace period setup ---------------------------------------------------
   const isBalloon      = BALLOON_TYPES.has(track.graceType)
-  const graceMonths    = track.graceType === 'none' ? 0 : track.graceMonths
   const effectiveTotal = isBalloon ? months : months  // total months unchanged
+  // Clamp so 'partial'/'full' grace never swallows the whole term — otherwise
+  // (for 'full' grace especially) the balance only ever grows and the loan
+  // never amortises, since there'd be no non-grace month left to repay it.
+  // Balloon types intentionally cover the whole term by design, so they're
+  // exempt from this clamp.
+  const rawGraceMonths = track.graceType === 'none' ? 0 : track.graceMonths
+  const graceMonths    = isBalloon ? rawGraceMonths : Math.min(rawGraceMonths, Math.max(0, effectiveTotal - 1))
 
   // -- Balloon pre-computation: compounded balance at start of amortisation -
   // For balloon-full the balance grows each month (interest accrues); for

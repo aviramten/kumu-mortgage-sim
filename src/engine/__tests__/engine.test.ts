@@ -488,3 +488,25 @@ describe('Regression — spitzer shortenTerm survives a later rate-schedule chan
     expect(result.rows[result.rows.length - 1].closingBalance).toBe(0)
   })
 })
+
+describe('Regression — full grace covering the whole term still amortises', () => {
+  // Simulates months being reduced (e.g. via the track-row UI) after
+  // graceMonths was already set to a large value, leaving graceMonths >= months.
+  // Full grace never pays principal on its own — without a clamp forcing at
+  // least one non-grace month, the balance would only ever grow and the loan
+  // would never be repaid.
+  const track = makeTrack({
+    type: 'fixed-unlinked', amount: 300_000, months: 12, annualRate: 5.0, schedule: 'spitzer',
+    graceType: 'full', graceMonths: 200,
+  })
+  const result = calculateTrack(track, MACRO_ZERO_CPI)
+
+  it('fully pays off within the track term instead of growing forever', () => {
+    expect(result.rows[result.rows.length - 1].closingBalance).toBe(0)
+  })
+
+  it('the last row is not still in grace (some real payment happens)', () => {
+    const last = result.rows[result.rows.length - 1]
+    expect(last.totalPayment).toBeGreaterThan(0)
+  })
+})

@@ -265,9 +265,6 @@ export function ComparisonTab() {
                       {m.label}
                     </th>
                   ))}
-                  {activeMixes.length >= 2 && (
-                    <th className="px-4 py-2.5 text-center font-medium">עדיף</th>
-                  )}
                 </tr>
               </thead>
               <tbody>
@@ -281,9 +278,6 @@ export function ComparisonTab() {
                   const bestValue = row.lowerIsBetter
                     ? Math.min(...values.map((v) => v.value))
                     : Math.max(...values.map((v) => v.value))
-
-                  // Best among all active mixes (for the "winner" badge)
-                  const winnerMeta = values.find((v) => v.value === bestValue)?.mixMeta
 
                   return (
                     <tr
@@ -310,22 +304,6 @@ export function ComparisonTab() {
                           </td>
                         )
                       })}
-
-                      {activeMixes.length >= 2 && (
-                        <td className="px-4 py-2.5 text-center">
-                          {winnerMeta && (
-                            <span
-                              className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium"
-                              style={{
-                                background: `${winnerMeta.color}1A`,
-                                color:      winnerMeta.color,
-                              }}
-                            >
-                              {winnerMeta.label}
-                            </span>
-                          )}
-                        </td>
-                      )}
                     </tr>
                   )
                 })}

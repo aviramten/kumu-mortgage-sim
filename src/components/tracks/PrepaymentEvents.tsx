@@ -130,12 +130,15 @@ function PrepaymentRow({ event, mixId, tracks, estimatedBalance, outcome }: Prep
                 setAmountFocused(false)
                 const v = parseInt(amountRaw.replace(/\D/g, ''), 10)
                 if (!isNaN(v) && v > 0) {
-                  upd({ amount: v })
-                  if (estimatedBalance !== null && v > estimatedBalance) {
+                  const clampedBalance = estimatedBalance !== null ? Math.floor(estimatedBalance) : null
+                  if (clampedBalance !== null && v > clampedBalance) {
+                    upd({ amount: clampedBalance })
                     showToast({
-                      message: `הסכום שהוזן (₪${formatNumber(v)}) גבוה מיתרת הקרן המשוערת לחודש זה (₪${formatNumber(Math.round(estimatedBalance))}). המערכת תטפל בסכום עד לגובה היתרה בפועל.`,
+                      message: `הסכום שהוזן (₪${formatNumber(v)}) גבוה מיתרת הקרן המשוערת לחודש זה. הסכום צומצם ל-₪${formatNumber(clampedBalance)}.`,
                       variant: 'yellow',
                     })
+                  } else {
+                    upd({ amount: v })
                   }
                 }
               }}

@@ -251,7 +251,12 @@ export const useMixStore = create<MixStore>()(
           ...state[tgtKey],
           id:             target,
           globalInputs:   { ...src.globalInputs },
-          macroForecasts: { ...src.macroForecasts },
+          macroForecasts: {
+            ...src.macroForecasts,
+            primeChangeSchedule:        [...src.macroForecasts.primeChangeSchedule],
+            makamChangeSchedule:        [...src.macroForecasts.makamChangeSchedule],
+            variableRateChangeSchedule: [...src.macroForecasts.variableRateChangeSchedule],
+          },
           tracks:         newTracks,
           prepayments:    newPrepayments,
           results:        null,
