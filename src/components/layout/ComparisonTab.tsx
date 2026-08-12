@@ -177,7 +177,7 @@ export function ComparisonTab() {
   const hasData = activeMixes.length >= 1 && activeMixes.every((m) => resultMap.get(m.id)!.trackResults.length > 0)
 
   return (
-    <div className="flex-1 flex flex-col gap-4 p-4 overflow-y-auto">
+    <div className="flex-1 flex flex-col gap-4 p-4 overflow-y-auto overflow-x-hidden max-w-full">
 
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
@@ -251,6 +251,7 @@ export function ComparisonTab() {
               </h3>
             </div>
 
+            <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-gray-50 dark:bg-kumu-navy text-kumu-navy-light dark:text-kumu-blue-lighter">
@@ -330,6 +331,7 @@ export function ComparisonTab() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </>
       )}

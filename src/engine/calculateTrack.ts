@@ -167,8 +167,16 @@ export function calculateTrack(
   let totalCost       = 0
   let effectiveMonths = 0
 
-  // shortenTerm: frozen PMT captured at first prepayment
-  let frozenPMT: number | null = null
+  // shortenTerm: frozen PMT (spitzer) / frozen principal slice (equalPrincipal)
+  // captured at first prepayment
+  let frozenPMT:               number | null = null
+  let frozenPrincipalPayment:  number | null = null
+  // Tracks the rate frozenPMT was baselined against — a rate reset (from a
+  // rate-change schedule or a variable-rate period boundary) always requires
+  // recalculating the payment, even mid-"shortened term"; otherwise interest
+  // computed at the new rate can exceed a stale frozen PMT and drive the
+  // balance up instead of down (negative amortisation).
+  let lastMonthlyRate: number | null = null
 
   for (let i = 0; i < effectiveTotal; i++) {
     const month     = i + 1
@@ -186,6 +194,11 @@ export function calculateTrack(
     // ── 2. Current effective rate ─────────────────────────────────────────
     const annualRate  = effectiveAnnualRate(track, month, macro)
     const monthlyRate = annualRate / 100 / 12
+
+    if (frozenPMT !== null && lastMonthlyRate !== null && monthlyRate !== lastMonthlyRate) {
+      frozenPMT = null
+    }
+    lastMonthlyRate = monthlyRate
 
     // ── 3. Determine if we are in a grace phase ───────────────────────────
     const inGrace = month <= graceMonths
@@ -242,8 +255,10 @@ export function calculateTrack(
         principalPayment = pmt - interestPayment
         monthlyTotal     = pmt
       } else {
-        // equalPrincipal
-        principalPayment = indexedBalance / remainingMonths
+        // equalPrincipal — use the frozen principal slice if shortenTerm is in effect
+        principalPayment = frozenPrincipalPayment !== null
+          ? frozenPrincipalPayment
+          : indexedBalance / remainingMonths
         interestPayment  = indexedBalance * monthlyRate
         monthlyTotal     = principalPayment + interestPayment
       }
@@ -265,16 +280,27 @@ export function calculateTrack(
       const balanceBefore = newBalance
 
       if (prepayment.mode === 'shortenTerm') {
-        // Capture frozen PMT BEFORE reducing balance
-        if (frozenPMT === null) {
-          const remainingAfterThis = effectiveTotal - i - 1
-          frozenPMT = spitzerPMTForPrepayment(balanceBefore, monthlyRate, remainingAfterThis)
+        // Capture frozen PMT / principal slice BEFORE reducing balance
+        const remainingAfterThis = effectiveTotal - i - 1
+        if (schedule === 'spitzer') {
+          if (frozenPMT === null) {
+            frozenPMT = spitzerPMTForPrepayment(balanceBefore, monthlyRate, remainingAfterThis)
+          }
+        } else if (frozenPrincipalPayment === null) {
+          // equalPrincipal — freeze the principal-per-month slice so the
+          // balance keeps decreasing at the pre-prepayment pace and the
+          // loan actually pays off early, instead of re-spreading the
+          // reduced balance across the original (unshortened) remaining term.
+          frozenPrincipalPayment = remainingAfterThis > 0
+            ? balanceBefore / remainingAfterThis
+            : balanceBefore
         }
         newBalance = applyPrepaymentBalance(balanceBefore, prepayment)
       } else {
-        // reducePayment — recalculate PMT for same remaining months
-        newBalance  = applyPrepaymentBalance(balanceBefore, prepayment)
-        frozenPMT   = null  // clear any previous frozen PMT; next month recalculates
+        // reducePayment — recalculate for the same remaining months
+        newBalance             = applyPrepaymentBalance(balanceBefore, prepayment)
+        frozenPMT              = null  // clear any previous freeze; next month recalculates
+        frozenPrincipalPayment = null
       }
 
       // Add prepayment amount to principal this month

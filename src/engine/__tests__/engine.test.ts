@@ -427,3 +427,64 @@ describe('Test #7 — Prepayment shortenTerm (spitzer, fixed-unlinked)', () => {
     expect(lastRow.closingBalance).toBe(0)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Regression — shortenTerm prepayment on equalPrincipal tracks
+//
+// The frozenPMT mechanism (which keeps the payment level after a shortenTerm
+// prepayment so the loan pays off early) only existed for the spitzer branch.
+// equalPrincipal always recomputed principalPayment = balance/remainingMonths
+// fresh every month, so a shortenTerm prepayment behaved exactly like
+// reducePayment — the term never actually shortened.
+// ---------------------------------------------------------------------------
+describe('Regression — equalPrincipal shortenTerm actually shortens the term', () => {
+  const track = makeTrack({
+    type: 'fixed-unlinked', amount: 400_000, months: 240, annualRate: 4.5, schedule: 'equalPrincipal',
+  })
+  const prepayments = [{ id: 'p1', month: 60, amount: 100_000, trackId: 'test-track', mode: 'shortenTerm' as const }]
+  const result = calculateTrack(track, MACRO_ZERO_CPI, prepayments)
+
+  it('effectiveMonths drops well below the original 240', () => {
+    expect(result.effectiveMonths).toBeLessThan(200)
+  })
+
+  it('closing balance of last row is 0', () => {
+    expect(result.rows[result.rows.length - 1].closingBalance).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Regression — shortenTerm prepayment must not ignore later rate resets
+//
+// frozenPMT used to stay fixed for the rest of the loan's life once set,
+// even as interestPayment kept being recomputed at the current (possibly
+// higher) rate. If interest ever exceeded the frozen PMT, principalPayment
+// went negative and the balance grew instead of shrinking — in the worst
+// case ballooning to an absurd final payment instead of paying off on
+// schedule.
+// ---------------------------------------------------------------------------
+describe('Regression — spitzer shortenTerm survives a later rate-schedule change', () => {
+  const track = makeTrack({
+    type: 'prime', amount: 1_000_000, months: 360, annualRate: 4.5, schedule: 'spitzer',
+  })
+  const macro: MacroForecasts = {
+    ...MACRO_ZERO_CPI,
+    // Deliberately extreme delta to make a would-be negative-amortisation
+    // bug unmistakable rather than borderline.
+    primeChangeSchedule: [{ period: 1, cumulativeDelta: 25 }],
+  }
+  const prepayments = [{ id: 'p1', month: 12, amount: 50_000, trackId: 'test-track', mode: 'shortenTerm' as const }]
+  const result = calculateTrack(track, macro, prepayments)
+
+  it('no month has a negative principal payment', () => {
+    expect(result.rows.every((r) => r.principalPayment >= 0)).toBe(true)
+  })
+
+  it('the balance never grows past the original principal', () => {
+    expect(Math.max(...result.rows.map((r) => r.closingBalance))).toBeLessThan(track.amount)
+  })
+
+  it('the loan still fully pays off by its own term', () => {
+    expect(result.rows[result.rows.length - 1].closingBalance).toBe(0)
+  })
+})

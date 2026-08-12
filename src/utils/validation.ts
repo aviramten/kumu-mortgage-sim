@@ -56,6 +56,12 @@ export const validateLTV = (
   purchaseStatus: PurchaseStatus,
 ): ValidationResult => {
   const limit = MAX_LTV[purchaseStatus]
+  if (ltv < 0) {
+    return {
+      status:  'error',
+      message: 'סכום המשכנתא יצא שלילי — ההון העצמי גבוה משווי הנכס. יש לבדוק את הנתונים שהוזנו',
+    }
+  }
   if (ltv > limit) {
     return {
       status:  'error',

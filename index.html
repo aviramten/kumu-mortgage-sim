@@ -5,6 +5,23 @@
     <link rel="icon" href="/kumu-sign.png" type="image/png" />
     <meta name="viewport" content="width=1280" />
     <title>KUMU — סימולטור משכנתא</title>
+    <script>
+      // Apply the persisted theme before React mounts, to avoid a flash of
+      // light mode on load. Mirrors useThemeStore's persisted shape and its
+      // system-preference fallback when nothing is stored yet.
+      (function () {
+        try {
+          var stored = localStorage.getItem('kumu-theme');
+          var theme = stored ? JSON.parse(stored).state.theme : null;
+          if (!theme) {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          if (theme === 'dark') document.documentElement.classList.add('dark');
+        } catch (e) {
+          // localStorage may be unavailable (e.g. private mode) — fall back to light.
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

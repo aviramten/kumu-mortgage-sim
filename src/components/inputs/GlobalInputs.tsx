@@ -78,7 +78,7 @@ function NumberInput({ value, onChange, placeholder, hasError = false, testId }:
 // LTV badge
 // ---------------------------------------------------------------------------
 function LTVBadge({ ltv, limit }: { ltv: number; limit: number }) {
-  const over  = ltv > limit
+  const over  = ltv > limit || ltv < 0
   const near  = ltv > limit * 0.9 && !over
 
   const bg = over  ? 'bg-red-50 dark:bg-red-900/20 text-kumu-error border-red-200 dark:border-red-800'

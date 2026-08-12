@@ -7,6 +7,7 @@ import {
 import { Header } from './Header'
 import { Footer } from './Footer'
 import { ComparisonTab } from './ComparisonTab'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { GlobalInputs } from '@/components/inputs/GlobalInputs'
 import { MacroForecasts } from '@/components/inputs/MacroForecasts'
 import { TracksManager } from '@/components/tracks/TracksManager'
@@ -82,6 +83,7 @@ interface DuplicateDropdownProps {
 
 function DuplicateDropdown({ currentMixId }: DuplicateDropdownProps) {
   const [open, setOpen] = useState(false)
+  const [pendingSource, setPendingSource] = useState<MixId | null>(null)
   const ref             = useRef<HTMLDivElement>(null)
   const { duplicateMix } = useMixStore()
   const mixA = useMix('a')
@@ -109,14 +111,13 @@ function DuplicateDropdown({ currentMixId }: DuplicateDropdownProps) {
 
   if (sources.length === 0) return null
 
-  const handleImport = (sourceId: MixId) => {
-    const sourceLabel  = MIX_LABELS[sourceId]
-    const currentLabel = MIX_LABELS[currentMixId]
-    const confirmed = window.confirm(
-      `הנתונים הקיימים ב${currentLabel} יוחלפו בנתוני ${sourceLabel}. להמשיך?`
-    )
-    if (!confirmed) { setOpen(false); return }
-    duplicateMix(sourceId, currentMixId)
+  const handleImportClick = (sourceId: MixId) => {
+    setPendingSource(sourceId)
+  }
+
+  const handleConfirmImport = () => {
+    if (pendingSource) duplicateMix(pendingSource, currentMixId)
+    setPendingSource(null)
     setOpen(false)
   }
 
@@ -141,7 +142,7 @@ function DuplicateDropdown({ currentMixId }: DuplicateDropdownProps) {
             <button
               key={sourceId}
               type="button"
-              onClick={() => handleImport(sourceId)}
+              onClick={() => handleImportClick(sourceId)}
               className="w-full flex items-center justify-between px-3 py-2.5 text-xs text-kumu-navy dark:text-white hover:bg-kumu-blue/5 dark:hover:bg-kumu-blue/10 transition-colors"
             >
               <span>{MIX_LABELS[sourceId]}</span>
@@ -149,6 +150,20 @@ function DuplicateDropdown({ currentMixId }: DuplicateDropdownProps) {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={pendingSource !== null}
+        title="ייבוא מתמהיל אחר"
+        message={
+          pendingSource
+            ? `הנתונים הקיימים ב${MIX_LABELS[currentMixId]} יוחלפו בנתוני ${MIX_LABELS[pendingSource]}. להמשיך?`
+            : ''
+        }
+        confirmLabel="ייבוא"
+        variant="warning"
+        onConfirm={handleConfirmImport}
+        onCancel={() => setPendingSource(null)}
+      />
     </div>
   )
 }
@@ -159,24 +174,34 @@ function DuplicateDropdown({ currentMixId }: DuplicateDropdownProps) {
 function ClearMixButton({ mixId }: { mixId: MixId }) {
   const { clearMix } = useMixStore()
   const mix          = useMix(mixId)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
   if (mix.tracks.length === 0) return null
 
   const handleClear = () => {
-    const confirmed = window.confirm(
-      `פעולה זו תנקה את כל המסלולים וההגדרות של ${MIX_LABELS[mixId]}. להמשיך?`
-    )
-    if (confirmed) clearMix(mixId)
+    clearMix(mixId)
+    setConfirmOpen(false)
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClear}
-      className="flex items-center gap-1.5 h-7 px-3 rounded-lg border border-transparent text-kumu-navy-light dark:text-kumu-blue-lighter text-xs font-medium hover:border-kumu-coral/40 hover:bg-kumu-coral/5 hover:text-kumu-coral dark:hover:text-kumu-coral transition-colors"
-    >
-      <Trash2 size={12} />
-      נקה תמהיל
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => setConfirmOpen(true)}
+        className="flex items-center gap-1.5 h-7 px-3 rounded-lg border border-transparent text-kumu-navy-light dark:text-kumu-blue-lighter text-xs font-medium hover:border-kumu-coral/40 hover:bg-kumu-coral/5 hover:text-kumu-coral dark:hover:text-kumu-coral transition-colors"
+      >
+        <Trash2 size={12} />
+        נקה תמהיל
+      </button>
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title="נקה תמהיל"
+        message={`פעולה זו תנקה את כל המסלולים וההגדרות של ${MIX_LABELS[mixId]}. להמשיך?`}
+        variant="danger"
+        onConfirm={handleClear}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </>
   )
 }
 
@@ -332,18 +357,21 @@ function ToastTriggers({ dispIncome }: { dispIncome: number }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // PTI > 40% toast — fires once per mix when it crosses the threshold
+  // PTI > 40% toast — fires once per mix when it crosses the threshold.
+  // dispIncome === 0 means no income data entered yet (nothing to check);
+  // dispIncome < 0 is a real problem and must still be checked, not skipped.
   useEffect(() => {
-    if (dispIncome <= 0) return
+    if (dispIncome === 0) return
     mixes.forEach(({ id, mix }) => {
       if (mix.tracks.length === 0) return
       const { kpis } = calculateMix(mix.tracks, mix.macroForecasts, mix.prepayments)
       const exceeds  = calculatePTI(dispIncome, kpis).status === 'exceeds'
       if (exceeds && !prevPtiRef.current[id]) {
-        show({
-          message: `PTI של ${MIX_LABELS[id]} חורג מ-40% — בדקו את יכולת ההחזר`,
-          variant: 'yellow',
-        })
+        show(
+          dispIncome < 0
+            ? { message: `${MIX_LABELS[id]}: ההכנסה הפנויה שלילית — לא ניתן לחשב יחס החזר`, variant: 'coral' }
+            : { message: `PTI של ${MIX_LABELS[id]} חורג מ-40% — בדקו את יכולת ההחזר`, variant: 'yellow' }
+        )
       }
       prevPtiRef.current[id] = exceeds
     })

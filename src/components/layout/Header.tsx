@@ -1,12 +1,10 @@
+import { useState } from 'react'
 import { Sun, Moon, LogOut, RotateCcw } from 'lucide-react'
 import { useThemeStore } from '@/store/useThemeStore'
 import { useAuthStore } from '@/store/useAuthStore'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 
-function handleResetAll() {
-  const confirmed = window.confirm(
-    'איפוס הנתונים ימחק את כל הסימולציות השמורות ויחזיר את המערכת למצב ההתחלתי. פעולה זו אינה הפיכה.'
-  )
-  if (!confirmed) return
+function resetAllData() {
   localStorage.removeItem('kumu-mix-store')
   localStorage.removeItem('kumu-transaction')
   localStorage.removeItem('kumu-costs-store')
@@ -17,6 +15,7 @@ function handleResetAll() {
 export function Header() {
   const { theme, toggleTheme } = useThemeStore()
   const { userEmail, logout } = useAuthStore()
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
 
   return (
     <header className="h-16 flex-shrink-0 flex items-center justify-between px-6 bg-white dark:bg-kumu-surface-dark border-b border-gray-100 dark:border-kumu-navy-light">
@@ -35,7 +34,7 @@ export function Header() {
         {/* Reset all data */}
         <button
           type="button"
-          onClick={handleResetAll}
+          onClick={() => setResetConfirmOpen(true)}
           title="אפס את כל הנתונים"
           aria-label="אפס את כל הנתונים"
           className="w-8 h-8 rounded-lg flex items-center justify-center text-kumu-navy-light dark:text-kumu-blue-lighter hover:bg-gray-100 dark:hover:bg-kumu-navy hover:text-kumu-coral transition-colors"
@@ -71,6 +70,16 @@ export function Header() {
           <LogOut size={16} />
         </button>
       </div>
+
+      <ConfirmDialog
+        isOpen={resetConfirmOpen}
+        title="אפס את כל הנתונים"
+        message="איפוס הנתונים ימחק את כל הסימולציות השמורות ויחזיר את המערכת למצב ההתחלתי. פעולה זו אינה הפיכה."
+        confirmLabel="איפוס"
+        variant="danger"
+        onConfirm={resetAllData}
+        onCancel={() => setResetConfirmOpen(false)}
+      />
     </header>
   )
 }

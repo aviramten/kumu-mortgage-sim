@@ -58,7 +58,7 @@ function NumericInput({
         'w-full h-9 rounded-lg border border-transparent',
         'px-3 text-sm text-right tabular-nums',
         'bg-gray-50 dark:bg-kumu-navy/60 text-kumu-navy dark:text-white',
-        'placeholder:text-gray-300 dark:placeholder:text-kumu-navy-light/50',
+        'placeholder:text-gray-300 dark:placeholder:text-kumu-blue-lighter/60',
         'hover:border-kumu-blue/30 focus:border-kumu-blue focus:bg-white dark:focus:bg-kumu-navy-dark',
         'outline-none focus:ring-1 focus:ring-kumu-blue/20 transition-all',
       ].join(' ')}
@@ -89,7 +89,7 @@ function LabelInput({ value, onChange }: { value: string; onChange: (v: string) 
 // ---------------------------------------------------------------------------
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark shadow-sm overflow-hidden">
+    <div className="min-w-0 rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark shadow-sm overflow-hidden">
       <div className="px-4 py-3 bg-gray-50 dark:bg-kumu-navy-dark/50 border-b border-gray-100 dark:border-kumu-navy-light">
         <span className="text-sm font-semibold text-kumu-navy dark:text-white">{title}</span>
       </div>
@@ -119,7 +119,7 @@ function IncomeSection() {
     <SectionCard title='הכנסות חודשיות'>
       <div
         className="grid items-center gap-3 px-4 py-1.5 border-b border-gray-50 dark:border-kumu-navy/50"
-        style={{ gridTemplateColumns: '1fr 130px 28px' }}
+        style={{ gridTemplateColumns: 'minmax(0,1fr) 130px 28px' }}
       >
         <span className="text-[10px] font-semibold uppercase tracking-widest text-kumu-navy-light dark:text-kumu-blue-lighter text-right">
           מקור הכנסה
@@ -138,9 +138,9 @@ function IncomeSection() {
           <div className="border-b border-gray-50 dark:border-kumu-navy/50 last:border-0">
             <div
               className="grid items-center gap-3 px-4 py-2 group"
-              style={{ gridTemplateColumns: '1fr 130px 28px' }}
+              style={{ gridTemplateColumns: 'minmax(0,1fr) 130px 28px' }}
             >
-              <div className="text-sm text-right">
+              <div className="min-w-0 text-sm text-right">
                 {row.isFixed ? (
                   <span className="text-kumu-navy dark:text-white">{row.label}</span>
                 ) : (
@@ -178,7 +178,7 @@ function IncomeSection() {
 
       <div
         className="grid items-center gap-3 px-4 py-3 bg-kumu-bg-light dark:bg-kumu-navy rounded-b-xl border-t-2 border-gray-100 dark:border-kumu-navy-light"
-        style={{ gridTemplateColumns: '1fr 130px 28px' }}
+        style={{ gridTemplateColumns: 'minmax(0,1fr) 130px 28px' }}
       >
         <span className="text-sm font-semibold text-kumu-navy dark:text-white text-right">
           סה"כ הכנסות
@@ -213,7 +213,7 @@ function LiabilitiesSection() {
     <SectionCard title='התחייבויות קיימות'>
       <div
         className="grid items-center gap-2 px-4 py-1.5 border-b border-gray-50 dark:border-kumu-navy/50"
-        style={{ gridTemplateColumns: '1fr 90px 90px 72px 28px' }}
+        style={{ gridTemplateColumns: 'minmax(0,1fr) 90px 90px 72px 28px' }}
       >
         <span className="text-[10px] font-semibold uppercase tracking-widest text-kumu-navy-light dark:text-kumu-blue-lighter text-right">
           התחייבות
@@ -241,12 +241,12 @@ function LiabilitiesSection() {
               <div
                 className={[
                   'grid items-center gap-2 px-4 py-2 group',
-                  isShortTerm ? 'opacity-50' : '',
+                  isShortTerm ? 'opacity-60 dark:opacity-75' : '',
                 ].join(' ')}
-                style={{ gridTemplateColumns: '1fr 90px 90px 72px 28px' }}
+                style={{ gridTemplateColumns: 'minmax(0,1fr) 90px 90px 72px 28px' }}
                 title={isShortTerm ? 'פחות מ-18 חודשים — לא נכלל בחישוב' : undefined}
               >
-                <div className="text-sm text-right">
+                <div className="min-w-0 text-sm text-right">
                   {row.isFixed ? (
                     <span className="text-kumu-navy dark:text-white">{row.label}</span>
                   ) : (
@@ -287,7 +287,7 @@ function LiabilitiesSection() {
 
       <div
         className="grid items-center gap-2 px-4 py-3 bg-kumu-bg-light dark:bg-kumu-navy rounded-b-xl border-t-2 border-gray-100 dark:border-kumu-navy-light"
-        style={{ gridTemplateColumns: '1fr 90px 90px 72px 28px' }}
+        style={{ gridTemplateColumns: 'minmax(0,1fr) 90px 90px 72px 28px' }}
       >
         <span className="text-sm font-semibold text-kumu-navy dark:text-white text-right">
           סה"כ החזרים חודשיים
@@ -344,7 +344,8 @@ function PTISummaryCard() {
     ],
   )
 
-  const anyExceeds = ptiResults.some((r) => r.pti?.status === 'exceeds')
+  const anyExceeds     = ptiResults.some((r) => r.pti?.status === 'exceeds')
+  const isNegativeIncome = dispIncome < 0
 
   return (
     <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark shadow-sm overflow-hidden">
@@ -366,7 +367,10 @@ function PTISummaryCard() {
           <div className="flex items-center gap-6 text-sm flex-wrap">
             <div className="flex items-center gap-1.5">
               <span className="text-kumu-navy-light dark:text-kumu-blue-lighter">הכנסה פנויה:</span>
-              <span className="font-semibold tabular-nums text-kumu-navy dark:text-white" dir="ltr">
+              <span
+                className={`font-semibold tabular-nums ${isNegativeIncome ? 'text-red-500' : 'text-kumu-navy dark:text-white'}`}
+                dir="ltr"
+              >
                 ₪{formatNumber(Math.round(dispIncome))}
               </span>
               {liabilities > 0 && (
@@ -375,13 +379,21 @@ function PTISummaryCard() {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-kumu-navy-light dark:text-kumu-blue-lighter">רף 40%:</span>
-              <span className="font-semibold tabular-nums text-kumu-navy dark:text-white" dir="ltr">
-                ₪{formatNumber(threshold)}
-              </span>
-            </div>
+            {!isNegativeIncome && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-kumu-navy-light dark:text-kumu-blue-lighter">רף 40%:</span>
+                <span className="font-semibold tabular-nums text-kumu-navy dark:text-white" dir="ltr">
+                  ₪{formatNumber(threshold)}
+                </span>
+              </div>
+            )}
           </div>
+
+          {isNegativeIncome && (
+            <div className="rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 px-4 py-3 text-sm text-red-700 dark:text-red-400 leading-relaxed">
+              ההכנסה הפנויה שלכם שלילית — ההתחייבויות הקיימות עולות על ההכנסות. לא ניתן לחשב יחס החזר עד שהתמונה הפיננסית הכוללת תשתפר.
+            </div>
+          )}
 
           {/* Per-mix rows */}
           <div className="flex flex-col gap-2">
@@ -398,8 +410,9 @@ function PTISummaryCard() {
                 )
               }
 
-              const isExceeds = pti.status === 'exceeds'
-              const isWarning = pti.status === 'warning'
+              const isExceeds       = pti.status === 'exceeds'
+              const isWarning       = pti.status === 'warning'
+              const isUncalculable  = !isFinite(pti.ptiRatio)
 
               return (
                 <div
@@ -423,25 +436,33 @@ function PTISummaryCard() {
                   </div>
 
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="tabular-nums text-kumu-navy-light dark:text-kumu-blue-lighter" dir="ltr">
-                      ₪{formatNumber(Math.round(pti.relevantPayment))}
-                    </span>
-                    <span
-                      className={[
-                        'font-bold tabular-nums w-14 text-left',
-                        isExceeds ? 'text-red-500' :
-                        isWarning ? 'text-yellow-600 dark:text-yellow-400' :
-                        'text-kumu-green',
-                      ].join(' ')}
-                      dir="ltr"
-                    >
-                      {pti.ptiRatio.toFixed(1)}%
-                    </span>
-                    {isExceeds && (
-                      <span className="text-xs text-red-500 font-medium">חורג מ-40%</span>
-                    )}
-                    {isWarning && (
-                      <span className="text-xs text-yellow-600 dark:text-yellow-400 font-medium">קרוב ל-40%</span>
+                    {isUncalculable ? (
+                      <>
+                        <span className="font-bold text-red-500">לא ניתן לחישוב</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="tabular-nums text-kumu-navy-light dark:text-kumu-blue-lighter" dir="ltr">
+                          ₪{formatNumber(Math.round(pti.relevantPayment))}
+                        </span>
+                        <span
+                          className={[
+                            'font-bold tabular-nums w-14 text-left',
+                            isExceeds ? 'text-red-500' :
+                            isWarning ? 'text-yellow-600 dark:text-yellow-400' :
+                            'text-kumu-green',
+                          ].join(' ')}
+                          dir="ltr"
+                        >
+                          {pti.ptiRatio.toFixed(1)}%
+                        </span>
+                        {isExceeds && (
+                          <span className="text-xs text-red-500 font-medium">חורג מ-40%</span>
+                        )}
+                        {isWarning && (
+                          <span className="text-xs text-yellow-600 dark:text-yellow-400 font-medium">קרוב ל-40%</span>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -467,7 +488,7 @@ function PTISummaryCard() {
 // ---------------------------------------------------------------------------
 export function AffordabilityTab() {
   return (
-    <div className="flex-1 p-6 overflow-y-auto">
+    <div className="flex-1 p-6 overflow-y-auto overflow-x-hidden max-w-full">
 
       {/* Page header */}
       <div className="mb-6">
@@ -485,7 +506,7 @@ export function AffordabilityTab() {
       </div>
 
       {/* Two-column: income (right) + liabilities (left) in RTL */}
-      <div className="grid grid-cols-2 gap-5 items-start">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5 items-start">
         <IncomeSection />
         <LiabilitiesSection />
       </div>

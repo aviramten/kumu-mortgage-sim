@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Info, Plus, Trash2 } from 'lucide-react'
 import { useMix, useMixStore } from '@/store/useMixStore'
+import { useToastStore } from '@/store/useToastStore'
 import { calculateMix } from '@/engine/calculateMix'
 import { formatNumber } from '@/utils/format'
 import type { PrepaymentEvent, PrepaymentMode } from '@/types/track'
@@ -71,6 +72,7 @@ interface PrepaymentRowProps {
 function PrepaymentRow({ event, mixId, tracks, estimatedBalance, outcome }: PrepaymentRowProps) {
   const updatePrepayment = useMixStore((s) => s.updatePrepayment)
   const removePrepayment = useMixStore((s) => s.removePrepayment)
+  const showToast        = useToastStore((s) => s.show)
 
   const upd = (partial: Partial<PrepaymentEvent>) =>
     updatePrepayment(mixId, event.id, partial)
@@ -127,7 +129,15 @@ function PrepaymentRow({ event, mixId, tracks, estimatedBalance, outcome }: Prep
               onBlur={() => {
                 setAmountFocused(false)
                 const v = parseInt(amountRaw.replace(/\D/g, ''), 10)
-                if (!isNaN(v) && v > 0) upd({ amount: v })
+                if (!isNaN(v) && v > 0) {
+                  upd({ amount: v })
+                  if (estimatedBalance !== null && v > estimatedBalance) {
+                    showToast({
+                      message: `הסכום שהוזן (₪${formatNumber(v)}) גבוה מיתרת הקרן המשוערת לחודש זה (₪${formatNumber(Math.round(estimatedBalance))}). המערכת תטפל בסכום עד לגובה היתרה בפועל.`,
+                      variant: 'yellow',
+                    })
+                  }
+                }
               }}
               onChange={(e) => setAmountRaw(e.target.value.replace(/\D/g, ''))}
               className={[numInputCls, 'pl-7'].join(' ')}

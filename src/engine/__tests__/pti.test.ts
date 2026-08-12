@@ -61,10 +61,20 @@ describe('PTI Calculator', () => {
     expect(result.status).toBe('ok')
   })
 
-  it('returns ok status with empty label when disposableIncome is zero', () => {
+  it('returns ok status with empty label when disposableIncome is zero (no data entered)', () => {
     const result = calculatePTI(0, mockKPIs(5_000, 5_000))
     expect(result.status).toBe('ok')
     expect(result.ptiRatio).toBe(0)
     expect(result.label).toContain('הזינו')
+  })
+
+  it('returns exceeds status with Infinity ratio when disposableIncome is negative', () => {
+    // Liabilities exceed income — a real problem, distinct from "no data entered"
+    const result = calculatePTI(-2_000, mockKPIs(5_000, 5_000))
+    expect(result.status).toBe('exceeds')
+    expect(result.ptiRatio).toBe(Infinity)
+    expect(result.relevantPayment).toBe(0)
+    expect(result.disposableIncome).toBe(-2_000)
+    expect(result.label).toContain('לא ניתן לחשב')
   })
 })

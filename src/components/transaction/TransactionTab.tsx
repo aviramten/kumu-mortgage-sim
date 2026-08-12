@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react'
 import { RotateCcw, Plus, X, ArrowLeftRight, FileText, Trash2 } from 'lucide-react'
 import { useTransactionStore } from '@/store/useTransactionStore'
 import { useCostsStore } from '@/store/useCostsStore'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { validateLTV, MAX_LTV } from '@/utils/validation'
 import { formatNumber } from '@/utils/format'
 import type { PurchaseStatus } from '@/types/macro'
@@ -76,7 +77,7 @@ function NumberInput({
 // LTV badge
 // ---------------------------------------------------------------------------
 function LTVBadge({ ltv, limit }: { ltv: number; limit: number }) {
-  const over = ltv > limit
+  const over = ltv > limit || ltv < 0
   const near = ltv > limit * 0.9 && !over
   const bg   = over  ? 'bg-red-50 dark:bg-red-900/20 text-kumu-error border-red-200 dark:border-red-800'
              : near  ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-kumu-yellow border-amber-200 dark:border-amber-700'
@@ -247,6 +248,9 @@ function TransactionInputs() {
       </div>
 
       <LTVBadge ltv={ltv} limit={maxLTV} />
+      <p className="text-xs text-gray-500 dark:text-kumu-blue-lighter/60 leading-snug -mt-1">
+        אחוז המימון מחושב לפי ההון העצמי בפועל — לאחר ניכוי הוצאות העסקה.
+      </p>
     </div>
   )
 }
@@ -310,8 +314,8 @@ function CostRowItem({
   onDelete:       (id: string) => void
 }) {
   return (
-    <div className="grid items-center gap-3 px-4 py-2.5 group" style={{ gridTemplateColumns: '1fr 140px 32px' }}>
-      <div className="text-sm text-right">
+    <div className="grid items-center gap-3 px-4 py-2.5 group" style={{ gridTemplateColumns: 'minmax(0,1fr) 140px 32px' }}>
+      <div className="min-w-0 text-sm text-right">
         {row.isFixed ? (
           <span className="text-kumu-navy dark:text-white">{row.label}</span>
         ) : (
@@ -359,7 +363,7 @@ function CostsSection() {
         {/* Column header */}
         <div
           className="grid items-center gap-3 px-4 py-2 bg-gray-50 dark:bg-kumu-navy-dark/50 border-b border-gray-100 dark:border-kumu-navy-light"
-          style={{ gridTemplateColumns: '1fr 140px 32px' }}
+          style={{ gridTemplateColumns: 'minmax(0,1fr) 140px 32px' }}
         >
           <span className="text-[10px] font-semibold uppercase tracking-widest text-kumu-navy-light dark:text-kumu-blue-lighter text-right">סעיף</span>
           <span className="text-[10px] font-semibold uppercase tracking-widest text-kumu-navy-light dark:text-kumu-blue-lighter text-right">סכום (₪)</span>
@@ -395,7 +399,7 @@ function CostsSection() {
 
         <div
           className="grid items-center gap-3 px-4 py-3.5 bg-kumu-bg-light dark:bg-kumu-navy rounded-b-xl border-t-2 border-gray-100 dark:border-kumu-navy-light"
-          style={{ gridTemplateColumns: '1fr 140px 32px' }}
+          style={{ gridTemplateColumns: 'minmax(0,1fr) 140px 32px' }}
         >
           <span className="text-sm font-semibold text-kumu-navy dark:text-white text-right">סה"כ הוצאות עסקה</span>
           <span className="text-xl font-bold text-kumu-navy dark:text-white tabular-nums text-right" dir="ltr">
@@ -466,23 +470,34 @@ function CostsSection() {
 function ClearTransactionButton() {
   const reset         = useTransactionStore((s) => s.reset)
   const resetAllCosts = useCostsStore((s) => s.resetAll)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const handleClear = () => {
-    if (!window.confirm('לנקות את כל נתוני העסקה וההוצאות?')) return
     reset()
     resetAllCosts()
+    setConfirmOpen(false)
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClear}
-      title="נקה נתוני עסקה"
-      className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-kumu-navy-light dark:text-kumu-blue-lighter border border-gray-200 dark:border-kumu-navy-light hover:border-kumu-coral hover:text-kumu-coral dark:hover:text-kumu-coral transition-colors"
-    >
-      <Trash2 size={13} />
-      נקה נתוני עסקה
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => setConfirmOpen(true)}
+        title="נקה נתוני עסקה"
+        className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-kumu-navy-light dark:text-kumu-blue-lighter border border-gray-200 dark:border-kumu-navy-light hover:border-kumu-coral hover:text-kumu-coral dark:hover:text-kumu-coral transition-colors"
+      >
+        <Trash2 size={13} />
+        נקה נתוני עסקה
+      </button>
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title="נקה נתוני עסקה"
+        message="לנקות את כל נתוני העסקה וההוצאות?"
+        variant="danger"
+        onConfirm={handleClear}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </>
   )
 }
 
@@ -491,7 +506,7 @@ function ClearTransactionButton() {
 // ---------------------------------------------------------------------------
 export function TransactionTab() {
   return (
-    <div className="flex-1 overflow-y-auto p-6">
+    <div className="flex-1 overflow-y-auto overflow-x-hidden max-w-full p-6">
       <div className="max-w-5xl mx-auto mb-6">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
@@ -509,7 +524,7 @@ export function TransactionTab() {
         </p>
       </div>
 
-      <div className="max-w-5xl mx-auto grid grid-cols-[320px_1fr] gap-6 items-start">
+      <div className="max-w-5xl mx-auto grid grid-cols-[320px_minmax(0,1fr)] gap-6 items-start">
         {/* Right: global inputs */}
         <TransactionInputs />
 

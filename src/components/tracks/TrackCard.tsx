@@ -117,8 +117,8 @@ function AmountInput({ value, onChange, hasError = false }: AmountInputProps) {
 // ---------------------------------------------------------------------------
 // IntegerInput — free text field for whole-number values (months, grace)
 // ---------------------------------------------------------------------------
-function IntegerInput({ value, onChange, className }: {
-  value: number; onChange: (n: number) => void; className?: string
+function IntegerInput({ value, onChange, className, title }: {
+  value: number; onChange: (n: number) => void; className?: string; title?: string
 }) {
   const [focused, setFocused] = useState(false)
   const [raw, setRaw]         = useState('')
@@ -128,6 +128,7 @@ function IntegerInput({ value, onChange, className }: {
       type="text"
       inputMode="numeric"
       dir="ltr"
+      title={title}
       value={focused ? raw : (value === 0 ? '' : String(value))}
       onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
       onBlur={() => {
@@ -309,7 +310,11 @@ export function TrackCard({ track, mixId, index }: TrackCardProps) {
             <div className="flex flex-col gap-1">
               <FieldLabel>תקופה (חודשים)</FieldLabel>
               <ValidationField result={monthsResult}>
-                <IntegerInput value={track.months} onChange={(v) => upd({ months: v })} />
+                <IntegerInput
+                  value={track.months}
+                  onChange={(v) => upd({ months: v })}
+                  title="יש להזין את התקופה במספר חודשים. לדוגמה: 25 שנים = 300 חודשים"
+                />
               </ValidationField>
             </div>
           </div>
@@ -406,7 +411,11 @@ export function TrackCard({ track, mixId, index }: TrackCardProps) {
                           : { status: 'ok' }
                       }
                     >
-                      <IntegerInput value={track.graceMonths} onChange={(v) => upd({ graceMonths: v })} />
+                      <IntegerInput
+                        value={track.graceMonths}
+                        onChange={(v) => upd({ graceMonths: v })}
+                        title="יש להזין את התקופה במספר חודשים. לדוגמה: שנה = 12 חודשים"
+                      />
                     </ValidationField>
                   </div>
                 )}

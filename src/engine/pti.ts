@@ -24,13 +24,27 @@ export function calculatePTI(
   disposableIncome: number,
   mixKPIs: MixKPIs,
 ): PTIResult {
-  if (disposableIncome <= 0) {
+  // No income data entered yet — neutral "nothing to show" state.
+  if (disposableIncome === 0) {
     return {
       disposableIncome: 0,
       relevantPayment:  0,
       ptiRatio:         0,
       status:           'ok',
       label:            'הזינו נתוני הכנסות כדי לחשב את יחס ההחזר.',
+    }
+  }
+
+  // Income data WAS entered, but liabilities exceed income — a real problem,
+  // not a "no data" state. PTI is undefined (division by a non-positive
+  // number), so it's reported as exceeding rather than silently as 0%/ok.
+  if (disposableIncome < 0) {
+    return {
+      disposableIncome,
+      relevantPayment: 0,
+      ptiRatio:         Infinity,
+      status:           'exceeds',
+      label:            'ההכנסה הפנויה אינה מספיקה לכיסוי ההתחייבויות הקיימות — לא ניתן לחשב יחס החזר.',
     }
   }
 
