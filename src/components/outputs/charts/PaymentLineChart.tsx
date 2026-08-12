@@ -17,12 +17,45 @@ import {
 } from '@/utils/chartTheme'
 import { formatCurrencyWhole, formatNumber } from '@/utils/format'
 import type { MixId } from '@/types/mix'
+import type { LoanTrack, TrackResult } from '@/types/track'
 
 // ---------------------------------------------------------------------------
 // Notable months — prepayments only (rate-change lines removed for clarity)
 // ---------------------------------------------------------------------------
 function getPrepaymentMonths(prepayments: { month: number }[]): Set<number> {
   return new Set(prepayments.map((p) => p.month))
+}
+
+// ---------------------------------------------------------------------------
+// Track-finished markers — a shortenTerm prepayment can pay a track off
+// years before its original term. When that happens the aggregate line
+// drops at that month (one less track contributing) without any smooth
+// transition — a real, correct change, but unlabeled it reads as a glitch.
+// These markers name the track so the drop is understood, not mistaken
+// for a bug.
+// ---------------------------------------------------------------------------
+const TRACK_TYPE_SHORT: Record<string, string> = {
+  prime: 'פריים', 'fixed-unlinked': 'קל"צ', 'fixed-linked': 'ק"צ',
+  'variable-linked': 'מ"צ', 'variable-unlinked': 'מל"צ', eligibility: 'זכאות',
+  'variable-makam': 'מק"מ', usd: 'דולר', eur: 'יורו',
+}
+
+interface TrackFinishMarker {
+  month: number
+  label: string
+}
+
+function getTrackFinishMarkers(tracks: LoanTrack[], trackResults: TrackResult[]): TrackFinishMarker[] {
+  const markers: TrackFinishMarker[] = []
+  for (const tr of trackResults) {
+    const track = tracks.find((t) => t.id === tr.trackId)
+    if (!track || tr.effectiveMonths <= 0 || tr.effectiveMonths >= track.months) continue
+    markers.push({
+      month: tr.effectiveMonths,
+      label: `${TRACK_TYPE_SHORT[track.type] ?? track.type} הסתיים`,
+    })
+  }
+  return markers
 }
 
 // ---------------------------------------------------------------------------
@@ -112,6 +145,11 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
   const prepaymentMonths = useMemo(
     () => getPrepaymentMonths(mix.prepayments),
     [mix.prepayments],
+  )
+
+  const trackFinishMarkers = useMemo(
+    () => getTrackFinishMarkers(mix.tracks, result.trackResults),
+    [mix.tracks, result.trackResults],
   )
 
   // ── X-axis: one tick per year (every 12 months) ──
@@ -223,6 +261,27 @@ export function PaymentLineChart({ mixId }: PaymentLineChartProps) {
                   strokeDasharray="4 3"
                   strokeWidth={1}
                   strokeOpacity={0.6}
+                />
+              ))}
+
+              {/* Track-finished markers — labels the drop caused by an early payoff */}
+              {trackFinishMarkers.map((marker) => (
+                <ReferenceLine
+                  key={`finish-${marker.month}`}
+                  x={marker.month}
+                  stroke="#E4572E"
+                  strokeDasharray="4 3"
+                  strokeWidth={1}
+                  strokeOpacity={0.7}
+                  label={{
+                    value: marker.label,
+                    position: 'insideTopLeft',
+                    style: {
+                      fontFamily: 'Heebo, sans-serif',
+                      fontSize: 10,
+                      fill: '#E4572E',
+                    },
+                  }}
                 />
               ))}
 
