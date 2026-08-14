@@ -35,7 +35,10 @@ function averagePayslipGroup(rows: IncomeRow[], ids: string[]): number {
     .map((id) => rows.find((r) => r.id === id)?.amount ?? 0)
     .filter((v) => v > 0)
   if (entered.length === 0) return 0
-  return entered.reduce((sum, v) => sum + v, 0) / entered.length
+  // Rounded to the nearest shekel — an average of 3 payslips doesn't divide
+  // evenly, and a repeating fraction has no business flowing into a ₪ total
+  // or the PTI math downstream.
+  return Math.round(entered.reduce((sum, v) => sum + v, 0) / entered.length)
 }
 
 // ---------------------------------------------------------------------------
