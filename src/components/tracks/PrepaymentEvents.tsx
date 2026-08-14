@@ -3,6 +3,7 @@ import { Info, Plus, Trash2 } from 'lucide-react'
 import { useMix, useMixStore } from '@/store/useMixStore'
 import { useToastStore } from '@/store/useToastStore'
 import { calculateMix } from '@/engine/calculateMix'
+import { useNumericField } from '@/hooks/useNumericField'
 import { formatNumber } from '@/utils/format'
 import type { PrepaymentEvent, PrepaymentMode } from '@/types/track'
 import type { MixId } from '@/types/mix'
@@ -77,8 +78,9 @@ function PrepaymentRow({ event, mixId, tracks, estimatedBalance, outcome }: Prep
   const upd = (partial: Partial<PrepaymentEvent>) =>
     updatePrepayment(mixId, event.id, partial)
 
-  const [monthFocused, setMonthFocused] = useState(false)
-  const [monthRaw,     setMonthRaw]     = useState('')
+  const monthField = useNumericField({
+    value: event.month, onChange: (v) => upd({ month: v }), min: 1, max: 360,
+  })
 
   const [amountFocused, setAmountFocused] = useState(false)
   const [amountRaw,     setAmountRaw]     = useState('')
@@ -98,14 +100,7 @@ function PrepaymentRow({ event, mixId, tracks, estimatedBalance, outcome }: Prep
               type="text"
               inputMode="numeric"
               dir="ltr"
-              value={monthFocused ? monthRaw : (event.month === 0 ? '' : String(event.month))}
-              onFocus={() => { setMonthFocused(true); setMonthRaw(event.month === 0 ? '' : String(event.month)) }}
-              onBlur={() => {
-                setMonthFocused(false)
-                const v = parseInt(monthRaw.replace(/\D/g, ''), 10)
-                if (!isNaN(v) && v >= 1) upd({ month: Math.min(360, v) })
-              }}
-              onChange={(e) => setMonthRaw(e.target.value.replace(/\D/g, ''))}
+              {...monthField}
               className={numInputCls}
             />
           </div>
@@ -125,7 +120,12 @@ function PrepaymentRow({ event, mixId, tracks, estimatedBalance, outcome }: Prep
               inputMode="numeric"
               dir="ltr"
               value={amountFocused ? amountRaw : (event.amount === 0 ? '' : String(event.amount))}
-              onFocus={() => { setAmountFocused(true); setAmountRaw(event.amount === 0 ? '' : String(event.amount)) }}
+              onFocus={(e) => {
+                setAmountFocused(true)
+                setAmountRaw(event.amount === 0 ? '' : String(event.amount))
+                const el = e.currentTarget
+                requestAnimationFrame(() => el.select())
+              }}
               onBlur={() => {
                 setAmountFocused(false)
                 const v = parseInt(amountRaw.replace(/\D/g, ''), 10)

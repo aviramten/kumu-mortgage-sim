@@ -9,6 +9,7 @@ import { useTransactionStore } from '@/store/useTransactionStore'
 import { useCostsStore } from '@/store/useCostsStore'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { validateLTV, MAX_LTV } from '@/utils/validation'
+import { useNumericField } from '@/hooks/useNumericField'
 import { formatNumber } from '@/utils/format'
 import type { PurchaseStatus } from '@/types/macro'
 import type { CostRow } from '@/types/costs'
@@ -38,15 +39,7 @@ function NumberInput({
   hasError?:   boolean
   testId?:     string
 }) {
-  const [focused, setFocused] = useState(false)
-  const [raw, setRaw]         = useState('')
-
-  const handleFocus = () => { setFocused(true); setRaw(value === 0 ? '' : String(Math.round(value))) }
-  const handleBlur  = () => {
-    setFocused(false)
-    const n = parseInt(raw.replace(/\D/g, ''), 10)
-    onChange(isNaN(n) ? 0 : n)
-  }
+  const field = useNumericField({ value, onChange, maxReasonable: 100_000_000 })
 
   return (
     <div className="relative flex items-center">
@@ -58,10 +51,7 @@ function NumberInput({
         inputMode="numeric"
         dir="ltr"
         data-testid={testId}
-        value={focused ? raw : (value === 0 ? '' : formatNumber(Math.round(value)))}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onChange={(e) => setRaw(e.target.value.replace(/\D/g, ''))}
+        {...field}
         placeholder={placeholder}
         className={[
           'w-full h-9 rounded-xl bg-transparent pl-7 pr-3 text-sm',
@@ -259,21 +249,13 @@ function TransactionInputs() {
 // Amount input for costs
 // ---------------------------------------------------------------------------
 function AmountInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const [focused, setFocused] = useState(false)
-  const [raw, setRaw]         = useState('')
+  const field = useNumericField({ value, onChange, maxReasonable: 5_000_000 })
   return (
     <input
       type="text"
       inputMode="numeric"
       dir="ltr"
-      value={focused ? raw : (value === 0 ? '' : formatNumber(value))}
-      onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
-      onBlur={() => {
-        setFocused(false)
-        const n = parseInt(raw.replace(/\D/g, ''), 10)
-        onChange(isNaN(n) ? 0 : n)
-      }}
-      onChange={(e) => setRaw(e.target.value.replace(/\D/g, ''))}
+      {...field}
       className={[
         'w-full h-9 rounded-lg border border-transparent',
         'px-3 text-sm text-right tabular-nums',

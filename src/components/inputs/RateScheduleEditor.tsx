@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import type { RateSchedulePoint } from '@/types/macro'
 import { validateSchedulePeriod, validateCumulativeDelta } from '@/utils/validation'
+import { useNumericField } from '@/hooks/useNumericField'
 
 // ---------------------------------------------------------------------------
 // RateScheduleEditor — editable step-function table of {period, cumulativeDelta}
@@ -37,11 +37,12 @@ function SchedulePointRow({
   const periodResult = validateSchedulePeriod(point.period, periodLabel)
   const deltaResult  = validateCumulativeDelta(point.cumulativeDelta)
 
-  const [periodFocused, setPeriodFocused] = useState(false)
-  const [periodRaw,     setPeriodRaw]     = useState('')
-
-  const [deltaFocused, setDeltaFocused] = useState(false)
-  const [deltaRaw,     setDeltaRaw]     = useState('')
+  const periodField = useNumericField({
+    value: point.period, onChange: (v) => onUpdate({ period: v }), min: 1, revertOnInvalid: true,
+  })
+  const deltaField = useNumericField({
+    value: point.cumulativeDelta, onChange: (v) => onUpdate({ cumulativeDelta: v }), format: 'decimal',
+  })
 
   return (
     <div className="flex items-center gap-2">
@@ -50,14 +51,7 @@ function SchedulePointRow({
           type="text"
           inputMode="numeric"
           dir="ltr"
-          value={periodFocused ? periodRaw : String(point.period)}
-          onFocus={() => { setPeriodFocused(true); setPeriodRaw(String(point.period)) }}
-          onBlur={() => {
-            setPeriodFocused(false)
-            const parsed = parseInt(periodRaw.replace(/\D/g, ''), 10)
-            if (!isNaN(parsed) && parsed >= 1) onUpdate({ period: parsed })
-          }}
-          onChange={(e) => setPeriodRaw(e.target.value.replace(/\D/g, ''))}
+          {...periodField}
           className={[
             'w-full h-full rounded-xl bg-transparent px-2 text-center text-sm dir-ltr',
             'text-kumu-navy dark:text-white outline-none',
@@ -74,14 +68,7 @@ function SchedulePointRow({
           type="text"
           inputMode="decimal"
           dir="ltr"
-          value={deltaFocused ? deltaRaw : (point.cumulativeDelta === 0 ? '' : String(point.cumulativeDelta))}
-          onFocus={() => { setDeltaFocused(true); setDeltaRaw(point.cumulativeDelta === 0 ? '' : String(point.cumulativeDelta)) }}
-          onBlur={() => {
-            setDeltaFocused(false)
-            const parsed = parseFloat(deltaRaw)
-            if (!isNaN(parsed)) onUpdate({ cumulativeDelta: parsed })
-          }}
-          onChange={(e) => setDeltaRaw(e.target.value)}
+          {...deltaField}
           className={[
             'w-full h-full rounded-xl bg-transparent pr-3 pl-7 text-sm dir-ltr',
             'text-kumu-navy dark:text-white outline-none',

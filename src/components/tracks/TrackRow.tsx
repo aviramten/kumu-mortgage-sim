@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { Trash2, Banknote } from 'lucide-react'
 import { useMixStore } from '@/store/useMixStore'
 import { validateTrackAmount, validateTrackMonths, validateAnnualRate } from '@/utils/validation'
-import { formatNumber, formatCurrencyWhole, roundMoney } from '@/utils/format'
+import { formatCurrencyWhole, roundMoney } from '@/utils/format'
 import { MIN_LOAN_MONTHS, MAX_LOAN_MONTHS } from '@/utils/constants'
+import { useNumericField } from '@/hooks/useNumericField'
 import type { LoanTrack, TrackType, GraceType, RateChangePeriod, TrackResult } from '@/types/track'
 import type { MacroForecasts } from '@/types/macro'
 import type { MixId } from '@/types/mix'
@@ -94,7 +95,12 @@ function PctCell({
       dir="ltr"
       title="הזן אחוז מסכום המשכנתא — הסכום יחושב אוטומטית"
       value={focused ? raw : (pct === 0 ? '' : pct.toFixed(1))}
-      onFocus={() => { setFocused(true); setRaw(pct === 0 ? '' : pct.toFixed(2)) }}
+      onFocus={(e) => {
+        setFocused(true)
+        setRaw(pct === 0 ? '' : pct.toFixed(2))
+        const el = e.currentTarget
+        requestAnimationFrame(() => el.select())
+      }}
       onBlur={() => {
         setFocused(false)
         const p = parseFloat(raw.replace(/[^\d.]/g, ''))
@@ -117,22 +123,14 @@ function PctCell({
 function AmountCell({ value, onChange, hasError }: {
   value: number; onChange: (n: number) => void; hasError?: boolean
 }) {
-  const [focused, setFocused] = useState(false)
-  const [raw, setRaw]         = useState('')
+  const field = useNumericField({ value, onChange, revertOnInvalid: true, maxReasonable: 50_000_000 })
   return (
     <input
       type="text"
       inputMode="numeric"
       dir="ltr"
       data-testid="track-amount"
-      value={focused ? raw : (value === 0 ? '' : formatNumber(Math.round(value)))}
-      onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(Math.round(value))) }}
-      onBlur={() => {
-        setFocused(false)
-        const n = parseInt(raw.replace(/\D/g, ''), 10)
-        onChange(!isNaN(n) && n >= 0 ? n : value)
-      }}
-      onChange={e => setRaw(e.target.value.replace(/\D/g, ''))}
+      {...field}
       className={[I, hasError ? ERR : ''].join(' ')}
     />
   )
@@ -143,8 +141,9 @@ function AmountCell({ value, onChange, hasError }: {
 function MonthsCell({ value, onChange, hasError }: {
   value: number; onChange: (n: number) => void; hasError?: boolean
 }) {
-  const [focused, setFocused] = useState(false)
-  const [raw, setRaw]         = useState('')
+  const field = useNumericField({
+    value, onChange, min: MIN_LOAN_MONTHS, max: MAX_LOAN_MONTHS, revertOnInvalid: true,
+  })
   return (
     <input
       type="text"
@@ -152,15 +151,7 @@ function MonthsCell({ value, onChange, hasError }: {
       dir="ltr"
       data-testid="track-months"
       title="יש להזין את התקופה במספר חודשים. לדוגמה: 25 שנים = 300 חודשים"
-      value={focused ? raw : (value === 0 ? '' : String(value))}
-      onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
-      onBlur={() => {
-        setFocused(false)
-        const n = parseInt(raw.replace(/\D/g, ''), 10)
-        if (!isNaN(n) && n >= 1) onChange(Math.min(MAX_LOAN_MONTHS, Math.max(MIN_LOAN_MONTHS, n)))
-        else onChange(value) // revert on empty/invalid
-      }}
-      onChange={e => setRaw(e.target.value.replace(/\D/g, ''))}
+      {...field}
       className={[I, hasError ? ERR : ''].join(' ')}
     />
   )
@@ -171,22 +162,14 @@ function MonthsCell({ value, onChange, hasError }: {
 function RateCell({ value, onChange, hasError }: {
   value: number; onChange: (n: number) => void; hasError?: boolean
 }) {
-  const [focused, setFocused] = useState(false)
-  const [raw, setRaw]         = useState('')
+  const field = useNumericField({ value, onChange, format: 'decimal', min: 0, max: 30 })
   return (
     <input
       type="text"
       inputMode="decimal"
       dir="ltr"
       data-testid="track-rate"
-      value={focused ? raw : (value === 0 ? '' : String(value))}
-      onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
-      onBlur={() => {
-        setFocused(false)
-        const n = parseFloat(raw)
-        if (!isNaN(n)) onChange(Math.min(30, Math.max(0, n)))
-      }}
-      onChange={e => setRaw(e.target.value)}
+      {...field}
       className={[I, hasError ? ERR : ''].join(' ')}
     />
   )

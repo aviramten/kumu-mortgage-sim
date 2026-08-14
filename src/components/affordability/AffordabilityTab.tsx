@@ -9,12 +9,13 @@
  * (handled in the store — Bank of Israel practice for near-expiry obligations).
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Plus, X, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useAffordabilityStore } from '@/store/useAffordabilityStore'
 import { useMix } from '@/store/useMixStore'
 import { calculateMix } from '@/engine/calculateMix'
 import { calculatePTI } from '@/engine/pti'
+import { useNumericField } from '@/hooks/useNumericField'
 import { formatNumber } from '@/utils/format'
 import type { IncomeRow, LiabilityRow } from '@/types/affordability'
 import type { MixId } from '@/types/mix'
@@ -27,14 +28,18 @@ function NumericInput({
   onChange,
   placeholder = '0',
   title,
+  maxReasonable,
 }: {
   value: number
   onChange: (v: number) => void
   placeholder?: string
   title?: string
+  maxReasonable?: number
 }) {
-  const [focused, setFocused] = useState(false)
-  const [raw, setRaw]         = useState('')
+  const field = useNumericField({
+    value, onChange, maxReasonable,
+    maxReasonableMessage: (n) => `הערך שהוזן (₪${formatNumber(n)}) גבוה במיוחד לשדה זה — כדאי לוודא שזה הסכום הנכון.`,
+  })
 
   return (
     <input
@@ -43,17 +48,7 @@ function NumericInput({
       dir="ltr"
       placeholder={placeholder}
       title={title}
-      value={focused ? raw : (value === 0 ? '' : formatNumber(value))}
-      onFocus={() => {
-        setFocused(true)
-        setRaw(value === 0 ? '' : String(value))
-      }}
-      onBlur={() => {
-        setFocused(false)
-        const n = parseInt(raw.replace(/\D/g, ''), 10)
-        onChange(isNaN(n) ? 0 : n)
-      }}
-      onChange={(e) => setRaw(e.target.value.replace(/\D/g, ''))}
+      {...field}
       className={[
         'w-full h-9 rounded-lg border border-transparent',
         'px-3 text-sm text-right tabular-nums',
@@ -147,7 +142,7 @@ function IncomeSection() {
                   <LabelInput value={row.label} onChange={(v) => updateIncomeLabel(row.id, v)} />
                 )}
               </div>
-              <NumericInput value={row.amount} onChange={(v) => updateIncomeAmount(row.id, v)} />
+              <NumericInput value={row.amount} onChange={(v) => updateIncomeAmount(row.id, v)} maxReasonable={1_000_000} />
               <div className="flex justify-center">
                 {!row.isFixed && (
                   <button
@@ -253,8 +248,8 @@ function LiabilitiesSection() {
                     <LabelInput value={row.label} onChange={(v) => updateLiabilityLabel(row.id, v)} />
                   )}
                 </div>
-                <NumericInput value={row.monthlyPayment} onChange={(v) => updateLiability(row.id, 'monthlyPayment', v)} />
-                <NumericInput value={row.balance} onChange={(v) => updateLiability(row.id, 'balance', v)} />
+                <NumericInput value={row.monthlyPayment} onChange={(v) => updateLiability(row.id, 'monthlyPayment', v)} maxReasonable={1_000_000} />
+                <NumericInput value={row.balance} onChange={(v) => updateLiability(row.id, 'balance', v)} maxReasonable={50_000_000} />
                 <NumericInput value={row.remainingMonths} onChange={(v) => updateLiability(row.id, 'remainingMonths', v)} title="יש להזין את התקופה במספר חודשים. לדוגמה: 25 שנים = 300 חודשים" />
                 <div className="flex justify-center">
                   {!row.isFixed && (

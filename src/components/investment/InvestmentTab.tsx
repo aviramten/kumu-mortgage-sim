@@ -16,6 +16,7 @@ import {
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { useThemeStore }  from '@/store/useThemeStore'
+import { useNumericField } from '@/hooks/useNumericField'
 import {
   calculateInvestment,
   calcBreakEvenRate,
@@ -27,7 +28,7 @@ import {
   getChartTooltipStyle, getChartAxisStyle,
   CHART_GRID_COLOR_LIGHT, CHART_GRID_COLOR_DARK,
 } from '@/utils/chartTheme'
-import { formatCurrencyWhole, formatNumber } from '@/utils/format'
+import { formatCurrencyWhole } from '@/utils/format'
 import { DEFAULT_CAPITAL_GAINS_TAX } from '@/utils/constants'
 
 // ---------------------------------------------------------------------------
@@ -98,8 +99,7 @@ function InputRow({
   suffix?:  string
   disabled?: boolean
 }) {
-  const [focused, setFocused] = useState(false)
-  const [raw, setRaw]         = useState('')
+  const field = useNumericField({ value, onChange, format: 'decimal', min, max })
 
   return (
     <div className="flex flex-col gap-1">
@@ -112,18 +112,7 @@ function InputRow({
           inputMode="decimal"
           placeholder="0"
           disabled={disabled}
-          value={focused ? raw : (value === 0 ? '' : String(value))}
-          onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
-          onBlur={() => {
-            setFocused(false)
-            const n = parseFloat(raw)
-            if (isNaN(n)) { onChange(0); return }
-            const clamped = (min !== undefined && n < min) ? min
-              : (max !== undefined && n > max) ? max
-              : n
-            onChange(clamped)
-          }}
-          onChange={(e) => setRaw(e.target.value)}
+          {...field}
           className={[
             'flex-1 text-sm rounded-lg border bg-transparent px-3 py-2 outline-none transition-colors',
             disabled
@@ -142,8 +131,7 @@ function InputRow({
 }
 
 function ComparisonInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const [focused, setFocused] = useState(false)
-  const [raw, setRaw]         = useState('')
+  const field = useNumericField({ value, onChange, maxReasonable: 50_000_000 })
 
   return (
     <div className="flex flex-col gap-1">
@@ -159,14 +147,7 @@ function ComparisonInput({ value, onChange }: { value: number; onChange: (v: num
           inputMode="numeric"
           dir="ltr"
           placeholder="0"
-          value={focused ? raw : (value === 0 ? '' : formatNumber(value))}
-          onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
-          onBlur={() => {
-            setFocused(false)
-            const n = parseInt(raw.replace(/\D/g, ''), 10)
-            onChange(isNaN(n) ? 0 : n)
-          }}
-          onChange={(e) => setRaw(e.target.value.replace(/\D/g, ''))}
+          {...field}
           className="w-full text-sm rounded-lg border border-gray-200 dark:border-kumu-navy-light bg-transparent text-kumu-navy dark:text-white px-3 pr-7 py-2 outline-none focus:border-kumu-blue transition-colors"
         />
       </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { useMixStore, useMix } from '@/store/useMixStore'
+import { useNumericField } from '@/hooks/useNumericField'
 import { validateCPI, validateFXChange } from '@/utils/validation'
 import type { ValidationResult } from '@/utils/validation'
 import type { MixId } from '@/types/mix'
@@ -42,8 +43,7 @@ interface PercentInputProps {
 }
 
 function PercentInput({ value, onChange, min = -20, max = 30 }: PercentInputProps) {
-  const [focused, setFocused] = useState(false)
-  const [raw, setRaw]         = useState('')
+  const field = useNumericField({ value, onChange, format: 'decimal', min, max })
 
   return (
     <div className="relative flex items-center">
@@ -51,14 +51,7 @@ function PercentInput({ value, onChange, min = -20, max = 30 }: PercentInputProp
         type="text"
         inputMode="decimal"
         dir="ltr"
-        value={focused ? raw : (value === 0 ? '' : String(value))}
-        onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
-        onBlur={() => {
-          setFocused(false)
-          const parsed = parseFloat(raw)
-          if (!isNaN(parsed)) onChange(Math.min(max, Math.max(min, parsed)))
-        }}
-        onChange={(e) => setRaw(e.target.value)}
+        {...field}
         className={[
           'w-full h-9 rounded-xl bg-transparent pr-3 pl-7 text-sm dir-ltr',
           'text-kumu-navy dark:text-white outline-none',

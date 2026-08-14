@@ -4,7 +4,7 @@ import { useMixStore, useMix } from '@/store/useMixStore'
 import { useTransactionStore } from '@/store/useTransactionStore'
 import { ValidationField } from '@/components/ui/ValidationField'
 import { validateLTV, MAX_LTV } from '@/utils/validation'
-import { formatNumber } from '@/utils/format'
+import { useNumericField } from '@/hooks/useNumericField'
 import type { MixId } from '@/types/mix'
 import type { GlobalInputs as GlobalInputsType, PurchaseStatus } from '@/types/macro'
 
@@ -29,24 +29,7 @@ interface NumberInputProps {
 }
 
 function NumberInput({ value, onChange, placeholder, hasError = false, testId }: NumberInputProps) {
-  const [focused, setFocused] = useState(false)
-  const [raw, setRaw]         = useState('')
-
-  const handleFocus = () => {
-    setFocused(true)
-    setRaw(value === 0 ? '' : String(Math.round(value)))
-  }
-
-  const handleBlur = () => {
-    setFocused(false)
-    const parsed = parseInt(raw.replace(/\D/g, ''), 10)
-    if (!isNaN(parsed) && parsed > 0) onChange(parsed)
-    else onChange(value) // revert to previous if invalid
-  }
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setRaw(e.target.value.replace(/\D/g, ''))
-  }
+  const field = useNumericField({ value, onChange, revertOnInvalid: true, maxReasonable: 100_000_000 })
 
   return (
     <div className="relative flex items-center">
@@ -59,10 +42,7 @@ function NumberInput({ value, onChange, placeholder, hasError = false, testId }:
         inputMode="numeric"
         dir="ltr"
         data-testid={testId}
-        value={focused ? raw : (value === 0 ? '' : formatNumber(Math.round(value)))}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onChange={handleChange}
+        {...field}
         placeholder={placeholder}
         className={[
           'w-full h-9 rounded-xl bg-transparent pl-7 pr-3 text-sm',
