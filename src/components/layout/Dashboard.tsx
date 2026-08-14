@@ -53,21 +53,25 @@ const TABS = [
 ] as const
 
 // ---------------------------------------------------------------------------
-// PTI badge — shows "!40+" on a mix tab when that mix exceeds the 40% limit
+// PTI badge — shows "PTI+" on a mix tab when that mix exceeds the 40% limit
 // ---------------------------------------------------------------------------
 function PTIBadge({ mixId, dispIncome }: { mixId: MixId; dispIncome: number }) {
   const mix = useMix(mixId)
 
-  const exceeds = useMemo(() => {
-    if (mix.tracks.length === 0) return false
+  const pti = useMemo(() => {
+    if (mix.tracks.length === 0) return null
     const { kpis } = calculateMix(mix.tracks, mix.macroForecasts, mix.prepayments)
-    return calculatePTI(dispIncome, kpis).status === 'exceeds'
+    return calculatePTI(dispIncome, kpis)
   }, [mix.tracks, mix.macroForecasts, mix.prepayments, dispIncome])
 
-  if (!exceeds) return null
+  if (!pti || pti.status !== 'exceeds') return null
+  const ratioLabel = isFinite(pti.ptiRatio) ? `${pti.ptiRatio.toFixed(0)}%` : '∞'
   return (
-    <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] font-bold bg-red-500 text-white rounded-full leading-none">
-      !40+
+    <span
+      title={`יחס החזר להכנסה: ${ratioLabel} — חורג מהגבול המקובל של 40%`}
+      className="inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] font-bold bg-red-500 text-white rounded-full leading-none"
+    >
+      PTI+
     </span>
   )
 }
