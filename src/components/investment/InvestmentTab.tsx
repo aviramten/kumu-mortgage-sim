@@ -500,7 +500,11 @@ export function InvestmentTab() {
 
               <button
                 type="button"
-                onClick={() => setInputs(DEFAULT_INPUTS)}
+                onClick={() => {
+                  setInputs(DEFAULT_INPUTS)
+                  setManualComparison(0)
+                  setComparisonYears(DEFAULT_COMPARISON_YEARS)
+                }}
                 className="flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-kumu-navy-light text-kumu-navy-light dark:text-kumu-blue-lighter text-xs py-2 hover:bg-gray-50 dark:hover:bg-kumu-navy transition-colors"
               >
                 <RefreshCw size={12} />

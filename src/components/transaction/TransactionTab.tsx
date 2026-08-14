@@ -266,7 +266,6 @@ function AmountInput({ value, onChange }: { value: number; onChange: (v: number)
       type="text"
       inputMode="numeric"
       dir="ltr"
-      placeholder="0"
       value={focused ? raw : (value === 0 ? '' : formatNumber(value))}
       onFocus={() => { setFocused(true); setRaw(value === 0 ? '' : String(value)) }}
       onBlur={() => {

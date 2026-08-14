@@ -265,6 +265,9 @@ export function ComparisonTab() {
                       {m.label}
                     </th>
                   ))}
+                  {activeMixes.length === 2 && (
+                    <th className="px-4 py-2.5 text-left font-medium">הפרש</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -278,6 +281,8 @@ export function ComparisonTab() {
                   const bestValue = row.lowerIsBetter
                     ? Math.min(...values.map((v) => v.value))
                     : Math.max(...values.map((v) => v.value))
+
+                  const diff = values.length === 2 ? values[0].value - values[1].value : null
 
                   return (
                     <tr
@@ -304,6 +309,12 @@ export function ComparisonTab() {
                           </td>
                         )
                       })}
+
+                      {diff !== null && (
+                        <td className="px-4 py-2.5 text-left tabular-nums text-kumu-navy-light dark:text-kumu-blue-lighter">
+                          {diff > 0 ? '+' : ''}{row.format(diff)}
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
