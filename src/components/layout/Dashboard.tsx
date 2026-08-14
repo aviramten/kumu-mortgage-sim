@@ -431,6 +431,7 @@ export function Dashboard() {
   const tabCls = ({ isActive }: { isActive: boolean }) =>
     [
       'flex items-center gap-2 px-4 py-3.5 text-sm font-medium border-b-2 transition-colors duration-150 whitespace-nowrap',
+      'outline-none focus-visible:ring-2 focus-visible:ring-kumu-blue focus-visible:ring-inset focus-visible:rounded-sm',
       isActive
         ? 'border-kumu-blue text-kumu-blue'
         : 'border-transparent text-kumu-navy-light dark:text-kumu-blue-lighter hover:text-kumu-navy dark:hover:text-white',
