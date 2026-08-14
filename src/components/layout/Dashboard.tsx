@@ -419,10 +419,8 @@ export function Dashboard() {
   }, [navigate])
 
   // Affordability data for PTI badges
-  const incomeRows      = useAffordabilityStore((s) => s.incomeRows)
-  const liabilityRows   = useAffordabilityStore((s) => s.liabilityRows)
-  const totalIncome     = incomeRows.reduce((s, r) => s + r.amount, 0)
-  const totalLiabilities = liabilityRows.reduce((s, r) => s + r.monthlyPayment, 0)
+  const totalIncome     = useAffordabilityStore((s) => s.totalIncome())
+  const totalLiabilities = useAffordabilityStore((s) => s.totalLiabilityPayments())
   const hasAffordabilityData = totalIncome > 0
   const dispIncome      = totalIncome - totalLiabilities
 

@@ -22,6 +22,22 @@ const FIXED_INCOME_ROWS: IncomeRow[] = [
   { id: 'espp',       label: 'ESPP',                                amount: 0, isFixed: true },
 ]
 
+// Each earner's 3 payslips are samples of the same income, not separate
+// income sources — they must be averaged (skipping unentered/0 slips), not
+// summed. The two earners' payslip groups stay independent of each other.
+const PAYSLIP_GROUPS = [
+  ['payslip1',  'payslip2',  'payslip3'],
+  ['payslip1b', 'payslip2b', 'payslip3b'],
+]
+
+function averagePayslipGroup(rows: IncomeRow[], ids: string[]): number {
+  const entered = ids
+    .map((id) => rows.find((r) => r.id === id)?.amount ?? 0)
+    .filter((v) => v > 0)
+  if (entered.length === 0) return 0
+  return entered.reduce((sum, v) => sum + v, 0) / entered.length
+}
+
 // ---------------------------------------------------------------------------
 // Fixed liability rows
 // ---------------------------------------------------------------------------
@@ -116,8 +132,17 @@ export const useAffordabilityStore = create<AffordabilityStore>()(
         })),
 
       // ---- Computed ----
-      totalIncome: () =>
-        get().incomeRows.reduce((sum, r) => sum + (r.amount || 0), 0),
+      totalIncome: () => {
+        const rows = get().incomeRows
+        const payslipIds = new Set(PAYSLIP_GROUPS.flat())
+        const payslipTotal = PAYSLIP_GROUPS.reduce(
+          (sum, group) => sum + averagePayslipGroup(rows, group), 0,
+        )
+        const otherTotal = rows.reduce(
+          (sum, r) => payslipIds.has(r.id) ? sum : sum + (r.amount || 0), 0,
+        )
+        return payslipTotal + otherTotal
+      },
 
       totalLiabilityPayments: () =>
         get().liabilityRows.reduce((sum, r) => {
