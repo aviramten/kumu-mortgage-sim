@@ -3,13 +3,10 @@
  *
  * Formula (monthly compounding):
  *   monthlyFactor = (1 + annualReturn / 100) ^ (1/12)
- *   balance       = (balance + monthlyDeposit) * monthlyFactor * (1 − monthlyFeeRate)
+ *   balance       = (balance + monthlyDeposit) * monthlyFactor
  *
  * Capital-gains tax: applied only to the PROFIT (not the principal deposits).
  * netValue = grossValue − (grossProfit × taxRate)
- *
- * Management fee: deducted monthly from the balance as a fraction of AUM.
- * Reduces the effective compound return without affecting the tax base directly.
  */
 
 // ---------------------------------------------------------------------------
@@ -27,8 +24,6 @@ export interface InvestmentInputs {
   annualReturn: number
   /** Capital gains tax rate, % (e.g. 25) */
   capitalGainsTax: number
-  /** Annual management / advisory fee, % of AUM (e.g. 0.5 for 0.5%) */
-  managementFeeRate?: number
 }
 
 export interface YearlyPoint {
@@ -75,21 +70,16 @@ export interface SensitivityRow {
 // ---------------------------------------------------------------------------
 
 export function calculateInvestment(inputs: InvestmentInputs): InvestmentResult {
-  const {
-    initialCapital, monthlyDeposit, years, annualReturn, capitalGainsTax,
-    managementFeeRate = 0,
-  } = inputs
+  const { initialCapital, monthlyDeposit, years, annualReturn, capitalGainsTax } = inputs
 
-  const months         = Math.round(years * 12)
-  const monthlyFactor  = Math.pow(1 + annualReturn / 100, 1 / 12)
-  const monthlyFeeRate = managementFeeRate / 100 / 12
+  const months        = Math.round(years * 12)
+  const monthlyFactor = Math.pow(1 + annualReturn / 100, 1 / 12)
 
   let balance = initialCapital
   const yearlyPortfolio: { year: number; value: number }[] = []
 
   for (let m = 1; m <= months; m++) {
     balance = (balance + monthlyDeposit) * monthlyFactor
-    if (monthlyFeeRate > 0) balance *= (1 - monthlyFeeRate)
     if (m % 12 === 0) {
       yearlyPortfolio.push({ year: m / 12, value: balance })
     }

@@ -1,29 +1,29 @@
 /**
- * InvestmentTab — investment vs. mortgage comparison calculator.
+ * InvestmentTab — standalone investment growth calculator, with an optional
+ * manual comparison against mortgage savings (e.g. figures the user worked
+ * out on the mix-comparison page — a higher-payment track that saves
+ * interest, extra equity, or a bigger monthly payment).
  *
  * Layout: split panel (RTL)
- *   Right column → inputs (mix selector + investment parameters)
+ *   Right column → inputs (mortgage-savings comparison + investment parameters)
  *   Left  column → outputs (break-even card, KPI row, chart, sensitivity table)
  */
 
 import { useState, useMemo, useCallback } from 'react'
-import { TrendingUp, TrendingDown, Minus, RefreshCw, Info } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { useThemeStore }  from '@/store/useThemeStore'
-import { useMixStore }    from '@/store/useMixStore'
-import { calculateMix }  from '@/engine/calculateMix'
 import {
   calculateInvestment,
   calcBreakEvenRate,
   buildSensitivityTable,
 } from '@/engine/calculateInvestment'
 import type { InvestmentInputs, SensitivityRow } from '@/engine/calculateInvestment'
-import type { MixId } from '@/types/mix'
 import {
-  MIX_A_COLOR, MIX_B_COLOR, MIX_C_COLOR,
+  MIX_A_COLOR,
   getChartTooltipStyle, getChartAxisStyle,
   CHART_GRID_COLOR_LIGHT, CHART_GRID_COLOR_DARK,
 } from '@/utils/chartTheme'
@@ -35,21 +35,16 @@ import { DEFAULT_CAPITAL_GAINS_TAX } from '@/utils/constants'
 // ---------------------------------------------------------------------------
 
 const DEFAULT_INPUTS: InvestmentInputs = {
-  initialCapital:   0,
-  monthlyDeposit:   0,
-  years:            20,
-  annualReturn:     0,
-  capitalGainsTax:  DEFAULT_CAPITAL_GAINS_TAX,
-  managementFeeRate: 0.5,
+  initialCapital:  0,
+  monthlyDeposit:  0,
+  years:           20,
+  annualReturn:    0,
+  capitalGainsTax: DEFAULT_CAPITAL_GAINS_TAX,
 }
 
-const SENSITIVITY_RATES = [4, 6, 8, 10]
+const DEFAULT_COMPARISON_YEARS = 20
 
-const MIX_META: { id: MixId; label: string; color: string }[] = [
-  { id: 'a', label: "תמהיל א׳", color: MIX_A_COLOR },
-  { id: 'b', label: "תמהיל ב׳", color: MIX_B_COLOR },
-  { id: 'c', label: "תמהיל ג׳", color: MIX_C_COLOR },
-]
+const SENSITIVITY_RATES = [4, 6, 8, 10]
 
 // ---------------------------------------------------------------------------
 // Spitzer savings curve
@@ -153,7 +148,7 @@ function ComparisonInput({ value, onChange }: { value: number; onChange: (v: num
   return (
     <div className="flex flex-col gap-1">
       <label className="text-[10px] font-semibold uppercase tracking-widest text-kumu-navy-light dark:text-kumu-blue-lighter">
-        חסכון במשכנתא (הזנה ידנית)
+        חסכון מצטבר במשכנתא (₪)
       </label>
       <div className="relative flex items-center">
         <span className="absolute right-3 text-xs text-kumu-navy-light dark:text-kumu-blue-lighter pointer-events-none">
@@ -338,53 +333,14 @@ export function InvestmentTab() {
   const { theme } = useThemeStore()
   const isDark    = theme === 'dark'
 
-  // Mix store — select each field individually; a selector returning a new
-  // object literal breaks Zustand's reference-equality check and causes an
-  // infinite render loop ("Maximum update depth exceeded" / React error #185).
-  const mixA = useMixStore((s) => s.mixA)
-  const mixB = useMixStore((s) => s.mixB)
-  const mixC = useMixStore((s) => s.mixC)
-
   // State
-  const [selectedMixId, setSelectedMixId] = useState<MixId>('a')
-  const [inputs, setInputs]               = useState<InvestmentInputs>(DEFAULT_INPUTS)
+  const [inputs, setInputs]                     = useState<InvestmentInputs>(DEFAULT_INPUTS)
   const [manualComparison, setManualComparison] = useState(0)
-  const [showRiskModal, setShowRiskModal]  = useState(false)
+  const [comparisonYears, setComparisonYears]   = useState(DEFAULT_COMPARISON_YEARS)
+  const [showRiskModal, setShowRiskModal]       = useState(false)
 
-  // Selected mix
-  const selectedMix = selectedMixId === 'a' ? mixA : selectedMixId === 'b' ? mixB : mixC
-
-  // Compute mix KPIs on-the-fly
-  const mixCalcResult = useMemo(() => {
-    if (!selectedMix.tracks.length) return null
-    try {
-      return calculateMix(selectedMix.tracks, selectedMix.macroForecasts, selectedMix.prepayments)
-    } catch {
-      return null
-    }
-  }, [selectedMix])
-
-  // Auto-derived comparison from mix
-  const autoComparison = mixCalcResult
-    ? mixCalcResult.kpis.totalInterest + mixCalcResult.kpis.totalIndexation
-    : 0
-  const hasAutoComparison = autoComparison > 0
-  const comparisonAmount  = hasAutoComparison ? autoComparison : manualComparison
-  const hasComparison     = comparisonAmount > 0
-
-  // Mix info for display
-  const mixMortgageAmount = selectedMix.globalInputs.mortgageAmount
-  const mixMaxMonths      = selectedMix.tracks.reduce((m, t) => Math.max(m, t.months), 0)
-
-  // Handle mix selection — also auto-sets years from mix term
-  const handleMixSelect = useCallback((id: MixId) => {
-    setSelectedMixId(id)
-    const mix       = id === 'a' ? mixA : id === 'b' ? mixB : mixC
-    const maxMonths = mix.tracks.reduce((m, t) => Math.max(m, t.months), 0)
-    if (maxMonths > 0) {
-      setInputs((prev) => ({ ...prev, years: Math.round(maxMonths / 12) }))
-    }
-  }, [mixA, mixB, mixC])
+  const comparisonAmount = manualComparison
+  const hasComparison    = comparisonAmount > 0
 
   const update = useCallback(
     <K extends keyof InvestmentInputs>(key: K, value: InvestmentInputs[K]) =>
@@ -408,7 +364,7 @@ export function InvestmentTab() {
     () => hasComparison ? calcBreakEvenRate(inputs, comparisonAmount) : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [inputs.initialCapital, inputs.monthlyDeposit, inputs.years,
-     inputs.capitalGainsTax, inputs.managementFeeRate, comparisonAmount, hasComparison],
+     inputs.capitalGainsTax, comparisonAmount, hasComparison],
   )
 
   // Sensitivity table
@@ -416,23 +372,32 @@ export function InvestmentTab() {
     () => hasComparison ? buildSensitivityTable(inputs, comparisonAmount, SENSITIVITY_RATES) : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [inputs.initialCapital, inputs.monthlyDeposit, inputs.years,
-     inputs.capitalGainsTax, inputs.managementFeeRate, comparisonAmount, hasComparison],
+     inputs.capitalGainsTax, comparisonAmount, hasComparison],
   )
 
-  // Chart data
+  // Chart data — the mortgage-savings curve runs over its own comparison
+  // period, independent of the investment horizon (inputs.years).
   const savingsCurve = useMemo(
-    () => buildSpitzerSavingsCurve(comparisonAmount, inputs.years),
-    [comparisonAmount, inputs.years],
+    () => buildSpitzerSavingsCurve(comparisonAmount, comparisonYears),
+    [comparisonAmount, comparisonYears],
   )
 
-  const chartData = useMemo(
-    () => investResult.yearlyPortfolio.map((p) => ({
-      year:            p.year,
-      portfolio:       Math.round(p.value),
-      mortgageSavings: hasComparison ? (savingsCurve.get(p.year) ?? null) : null,
-    })),
-    [investResult.yearlyPortfolio, savingsCurve, hasComparison],
-  )
+  // Spans the longer of the two periods, so neither curve gets silently cut
+  // off when the investment horizon and the mortgage-comparison period differ.
+  const chartData = useMemo(() => {
+    const portfolioByYear = new Map(investResult.yearlyPortfolio.map((p) => [p.year, p.value]))
+    const maxYear = Math.max(inputs.years, hasComparison ? comparisonYears : 0)
+    const data: { year: number; portfolio: number | null; mortgageSavings: number | null }[] = []
+    for (let year = 1; year <= maxYear; year++) {
+      const portfolio = portfolioByYear.get(year)
+      data.push({
+        year,
+        portfolio:       portfolio !== undefined ? Math.round(portfolio) : null,
+        mortgageSavings: hasComparison ? (savingsCurve.get(year) ?? null) : null,
+      })
+    }
+    return data
+  }, [investResult.yearlyPortfolio, inputs.years, savingsCurve, comparisonYears, hasComparison])
 
   // Comparison summary
   const netDiff   = investResult.netValue - comparisonAmount
@@ -465,71 +430,26 @@ export function InvestmentTab() {
         {/* ── Inputs column (RIGHT in RTL) ── */}
         <div className="flex flex-col gap-3 overflow-y-auto">
 
-          {/* Mix selector */}
+          {/* Mortgage-savings comparison (manual) */}
           <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100 dark:border-kumu-navy-light">
               <h2 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
-                בחירת תמהיל להשוואה
+                השוואה מול חיסכון במשכנתא
               </h2>
             </div>
 
             <div className="p-4 flex flex-col gap-3">
-              {/* 3 mix buttons */}
-              <div className="flex gap-1.5">
-                {MIX_META.map(({ id, label }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => handleMixSelect(id)}
-                    className={[
-                      'flex-1 rounded-lg py-2 text-xs font-medium transition-colors',
-                      selectedMixId === id
-                        ? 'bg-kumu-blue text-white'
-                        : 'border border-gray-200 dark:border-kumu-navy-light text-kumu-navy-light dark:text-kumu-blue-lighter hover:border-kumu-blue hover:text-kumu-blue dark:hover:text-kumu-blue-light',
-                    ].join(' ')}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Mix status */}
-              {hasAutoComparison ? (
-                <div className="flex flex-col gap-2 rounded-lg bg-kumu-blue/5 dark:bg-kumu-blue/10 border border-kumu-blue/15 dark:border-kumu-blue/25 p-3">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-kumu-navy-light dark:text-kumu-blue-lighter">קרן משכנתא</span>
-                    <span className="tabular-nums font-medium text-kumu-navy dark:text-white">
-                      {formatCurrencyWhole(mixMortgageAmount)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-kumu-navy-light dark:text-kumu-blue-lighter">סך ריבית + הצמדה</span>
-                    <span className="tabular-nums font-semibold text-kumu-coral">
-                      {formatCurrencyWhole(autoComparison)}
-                    </span>
-                  </div>
-                  {mixMaxMonths > 0 && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-kumu-navy-light dark:text-kumu-blue-lighter">תקופה</span>
-                      <span className="tabular-nums text-kumu-navy dark:text-white">
-                        {Math.round(mixMaxMonths / 12)} שנים
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-3">
-                  <Info size={13} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-700 dark:text-amber-300 leading-snug">
-                    לתמהיל זה אין מסלולים מחושבים. ניתן להזין את חסכון המשכנתא ידנית למטה.
-                  </p>
-                </div>
-              )}
-
-              {/* Manual comparison input (only when no auto) */}
-              {!hasAutoComparison && (
-                <ComparisonInput value={manualComparison} onChange={setManualComparison} />
-              )}
+              <p className="text-xs text-kumu-navy-light dark:text-kumu-blue-lighter leading-relaxed">
+                השוו בין 2 תמהילים בעמוד ההשוואה — למשל מסלול עם החזר חודשי גבוה יותר שחוסך ריבית, או תמהיל עם הון עצמי גדול יותר — והזינו כאן כמה כסף זה חוסך במצטבר.
+              </p>
+              <ComparisonInput value={manualComparison} onChange={setManualComparison} />
+              <InputRow
+                label="תקופת החיסכון (שנים)"
+                value={comparisonYears}
+                onChange={(v) => setComparisonYears(Math.max(1, Math.min(40, v)))}
+                min={1}
+                max={40}
+              />
             </div>
           </div>
 
@@ -567,14 +487,6 @@ export function InvestmentTab() {
                 onChange={handleAnnualReturnChange}
                 min={0}
                 max={30}
-                suffix="%"
-              />
-              <InputRow
-                label="דמי ניהול שנתיים"
-                value={inputs.managementFeeRate ?? 0}
-                onChange={(v) => update('managementFeeRate', Math.max(0, Math.min(5, v)))}
-                min={0}
-                max={5}
                 suffix="%"
               />
               <InputRow
@@ -632,13 +544,13 @@ export function InvestmentTab() {
               <KpiCard
                 label="יתרת תיק נטו"
                 value={formatCurrencyWhole(investResult.netValue)}
-                sub="אחרי מס ודמי ניהול"
+                sub="אחרי מס"
                 accent="text-kumu-green"
               />
               <KpiCard
                 label="חסכון במשכנתא"
                 value={formatCurrencyWhole(comparisonAmount)}
-                sub={hasAutoComparison ? 'ריבית + הצמדה מהתמהיל' : 'הזנה ידנית'}
+                sub="הזנה ידנית"
                 accent="text-kumu-coral"
               />
               <KpiCard
@@ -658,7 +570,7 @@ export function InvestmentTab() {
               <KpiCard
                 label="שווי נטו"
                 value={formatCurrencyWhole(investResult.netValue)}
-                sub="לאחר מס ודמי ניהול"
+                sub="לאחר מס רווחי הון"
               />
               <KpiCard
                 label="סך הפקדות"
