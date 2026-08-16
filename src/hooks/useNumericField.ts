@@ -88,8 +88,11 @@ export function useNumericField({
     },
 
     onChange: (e) => {
+      // 'decimal' keeps a leading "-" so negative deltas (e.g. a forecast
+      // rate decrease) can be typed at all — parseFloat on blur handles the
+      // rest, a stray "-" elsewhere in the string just gets ignored.
       const v = format === 'decimal'
-        ? e.target.value.replace(/[^\d.]/g, '')
+        ? e.target.value.replace(/[^\d.-]/g, '')
         : e.target.value.replace(/\D/g, '')
       setRaw(v)
     },
