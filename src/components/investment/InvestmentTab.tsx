@@ -9,41 +9,31 @@
  *   Left  column → outputs (break-even card, KPI row, chart, sensitivity table)
  */
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { useThemeStore }  from '@/store/useThemeStore'
+import { useInvestmentStore } from '@/store/useInvestmentStore'
 import { useNumericField } from '@/hooks/useNumericField'
 import {
   calculateInvestment,
   calcBreakEvenRate,
   buildSensitivityTable,
 } from '@/engine/calculateInvestment'
-import type { InvestmentInputs, SensitivityRow } from '@/engine/calculateInvestment'
+import type { SensitivityRow } from '@/engine/calculateInvestment'
 import {
   MIX_A_COLOR,
   getChartTooltipStyle, getChartAxisStyle,
   CHART_GRID_COLOR_LIGHT, CHART_GRID_COLOR_DARK,
 } from '@/utils/chartTheme'
 import { formatCurrencyWhole } from '@/utils/format'
-import { DEFAULT_CAPITAL_GAINS_TAX } from '@/utils/constants'
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const DEFAULT_INPUTS: InvestmentInputs = {
-  initialCapital:  0,
-  monthlyDeposit:  0,
-  years:           20,
-  annualReturn:    0,
-  capitalGainsTax: DEFAULT_CAPITAL_GAINS_TAX,
-}
-
-const DEFAULT_COMPARISON_YEARS = 20
 
 const SENSITIVITY_RATES = [4, 6, 8, 10]
 
@@ -314,25 +304,20 @@ export function InvestmentTab() {
   const { theme } = useThemeStore()
   const isDark    = theme === 'dark'
 
-  // State
-  const [inputs, setInputs]                     = useState<InvestmentInputs>(DEFAULT_INPUTS)
-  const [manualComparison, setManualComparison] = useState(0)
-  const [comparisonYears, setComparisonYears]   = useState(DEFAULT_COMPARISON_YEARS)
-  const [showRiskModal, setShowRiskModal]       = useState(false)
+  // State — persisted so it survives navigating away and back
+  const {
+    inputs, manualComparison, comparisonYears,
+    updateInput: update, setManualComparison, setComparisonYears, reset,
+  } = useInvestmentStore()
+  const [showRiskModal, setShowRiskModal] = useState(false)
 
   const comparisonAmount = manualComparison
   const hasComparison    = comparisonAmount > 0
 
-  const update = useCallback(
-    <K extends keyof InvestmentInputs>(key: K, value: InvestmentInputs[K]) =>
-      setInputs((prev) => ({ ...prev, [key]: value })),
-    [],
-  )
-
-  const handleAnnualReturnChange = useCallback((v: number) => {
+  const handleAnnualReturnChange = (v: number) => {
     update('annualReturn', v)
     if (v > 0) setShowRiskModal(true)
-  }, [update])
+  }
 
   // Investment result
   const investResult = useMemo(
@@ -481,11 +466,7 @@ export function InvestmentTab() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setInputs(DEFAULT_INPUTS)
-                  setManualComparison(0)
-                  setComparisonYears(DEFAULT_COMPARISON_YEARS)
-                }}
+                onClick={reset}
                 className="flex items-center justify-center gap-1.5 rounded-xl border border-gray-200 dark:border-kumu-navy-light text-kumu-navy-light dark:text-kumu-blue-lighter text-xs py-2 hover:bg-gray-50 dark:hover:bg-kumu-navy transition-colors"
               >
                 <RefreshCw size={12} />
