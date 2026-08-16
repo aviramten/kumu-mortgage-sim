@@ -76,6 +76,9 @@ interface AffordabilityStore {
   totalIncome:             () => number
   totalLiabilityPayments:  () => number
   disposableIncome:        () => number
+
+  /** Resets income and liability rows back to the empty fixed set (drops custom rows). */
+  reset: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +162,8 @@ export const useAffordabilityStore = create<AffordabilityStore>()(
         const g = get()
         return g.totalIncome() - g.totalLiabilityPayments()
       },
+
+      reset: () => set({ incomeRows: FIXED_INCOME_ROWS, liabilityRows: FIXED_LIABILITY_ROWS }),
     }),
     {
       name: 'kumu-affordability-store',

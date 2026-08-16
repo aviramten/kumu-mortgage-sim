@@ -9,14 +9,15 @@
  * (handled in the store — Bank of Israel practice for near-expiry obligations).
  */
 
-import { useMemo } from 'react'
-import { Plus, X, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Plus, X, ShieldCheck, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react'
 import { useAffordabilityStore } from '@/store/useAffordabilityStore'
 import { useMix } from '@/store/useMixStore'
 import { calculateMix } from '@/engine/calculateMix'
 import { calculatePTI } from '@/engine/pti'
 import { useNumericField } from '@/hooks/useNumericField'
 import { formatNumber } from '@/utils/format'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import type { IncomeRow, LiabilityRow } from '@/types/affordability'
 import type { MixId } from '@/types/mix'
 
@@ -479,6 +480,36 @@ function PTISummaryCard() {
 }
 
 // ---------------------------------------------------------------------------
+// Clear affordability data button
+// ---------------------------------------------------------------------------
+function ClearAffordabilityButton() {
+  const reset = useAffordabilityStore((s) => s.reset)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setConfirmOpen(true)}
+        title="נקה נתוני כושר החזר"
+        className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-kumu-navy-light dark:text-kumu-blue-lighter border border-gray-200 dark:border-kumu-navy-light hover:border-kumu-coral hover:text-kumu-coral dark:hover:text-kumu-coral transition-colors"
+      >
+        <Trash2 size={13} />
+        נקה נתוני כושר החזר
+      </button>
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        title="נקה נתוני כושר החזר"
+        message="לנקות את כל נתוני ההכנסות וההתחייבויות?"
+        variant="danger"
+        onConfirm={() => { reset(); setConfirmOpen(false) }}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
 export function AffordabilityTab() {
@@ -487,13 +518,16 @@ export function AffordabilityTab() {
 
       {/* Page header */}
       <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-9 h-9 rounded-xl bg-kumu-blue/10 dark:bg-kumu-blue/20 flex items-center justify-center">
-            <ShieldCheck size={18} className="text-kumu-blue" />
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-kumu-blue/10 dark:bg-kumu-blue/20 flex items-center justify-center">
+              <ShieldCheck size={18} className="text-kumu-blue" />
+            </div>
+            <h1 className="text-xl font-semibold text-kumu-navy dark:text-white">
+              כושר החזר
+            </h1>
           </div>
-          <h1 className="text-xl font-semibold text-kumu-navy dark:text-white">
-            כושר החזר
-          </h1>
+          <ClearAffordabilityButton />
         </div>
         <p className="text-sm text-kumu-navy-light dark:text-kumu-blue-lighter leading-relaxed max-w-2xl">
           לפני שמחליטים על גובה המשכנתא — כדאי לוודא שההחזר החודשי מתאים לתמונה הכלכלית המלאה שלכם.
