@@ -9,6 +9,8 @@ function resetAllData() {
   localStorage.removeItem('kumu-transaction')
   localStorage.removeItem('kumu-costs-store')
   localStorage.removeItem('kumu-affordability-store')
+  localStorage.removeItem('kumu-investment-store')
+  localStorage.removeItem('kumu-comparison-store')
   window.location.reload()
 }
 
