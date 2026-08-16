@@ -20,7 +20,6 @@ import { useInvestmentStore } from '@/store/useInvestmentStore'
 import { useNumericField } from '@/hooks/useNumericField'
 import {
   calculateInvestment,
-  calcBreakEvenRate,
   buildSensitivityTable,
 } from '@/engine/calculateInvestment'
 import type { SensitivityRow } from '@/engine/calculateInvestment'
@@ -225,12 +224,10 @@ function CustomTooltip({
 
 function SensitivityTable({
   rows,
-  breakEvenRate,
   isDark,
 }: {
-  rows:          SensitivityRow[]
-  breakEvenRate: number | null
-  isDark:        boolean
+  rows:   SensitivityRow[]
+  isDark: boolean
 }) {
   void isDark
   return (
@@ -239,11 +236,6 @@ function SensitivityTable({
         <h3 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
           ניתוח רגישות — תשואות שונות
         </h3>
-        {breakEvenRate !== null && (
-          <span className="text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter">
-            (שיוויון ב-{breakEvenRate}%)
-          </span>
-        )}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -323,14 +315,6 @@ export function InvestmentTab() {
   const investResult = useMemo(
     () => calculateInvestment(inputs),
     [inputs],
-  )
-
-  // Break-even rate
-  const breakEvenRate = useMemo(
-    () => hasComparison ? calcBreakEvenRate(inputs, comparisonAmount) : null,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [inputs.initialCapital, inputs.monthlyDeposit, inputs.years,
-     inputs.capitalGainsTax, comparisonAmount, hasComparison],
   )
 
   // Sensitivity table
@@ -479,31 +463,6 @@ export function InvestmentTab() {
         {/* ── Outputs column (LEFT in RTL) ── */}
         <div className="flex flex-col gap-3 overflow-y-auto">
 
-          {/* Break-even rate card — only when comparison exists */}
-          {hasComparison && (
-            <div className={[
-              'rounded-xl border p-4 flex items-center gap-4',
-              breakEvenRate === null
-                ? 'bg-red-50 dark:bg-red-900/15 border-red-200 dark:border-red-800'
-                : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700',
-            ].join(' ')}>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-700 dark:text-amber-400 mb-1">
-                  ריבית שיוויון לשנה
-                </p>
-                <p className="text-2xl font-bold tabular-nums text-amber-800 dark:text-amber-300">
-                  {breakEvenRate === null ? 'לא ניתן להשיג' : `${breakEvenRate}%`}
-                </p>
-                <p className="text-[11px] text-amber-700/80 dark:text-amber-400/80 mt-1 leading-snug">
-                  {breakEvenRate === null
-                    ? 'גם בתשואה של 100% ההשקעה לא מגיעה לסכום חסכון המשכנתא'
-                    : `תשואה שנתית מינימלית שבה ערך התיק שווה לחסכון במשכנתא`}
-                </p>
-              </div>
-              <div className="text-4xl text-amber-500 dark:text-amber-400 shrink-0">⚖</div>
-            </div>
-          )}
-
           {/* KPI cards */}
           {hasComparison ? (
             <div className="grid grid-cols-3 gap-2.5">
@@ -649,7 +608,6 @@ export function InvestmentTab() {
           {hasComparison && sensitivityRows.length > 0 && (
             <SensitivityTable
               rows={sensitivityRows}
-              breakEvenRate={breakEvenRate}
               isDark={isDark}
             />
           )}

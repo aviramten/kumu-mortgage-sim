@@ -96,44 +96,6 @@ export function calculateInvestment(inputs: InvestmentInputs): InvestmentResult 
 }
 
 // ---------------------------------------------------------------------------
-// Break-even rate
-// Binary-search for the minimum annualReturn at which netValue >= targetNetValue.
-// Returns null if even 100% return can't reach the target (infeasible).
-// annualReturn in inputs is ignored — we search over it.
-// ---------------------------------------------------------------------------
-
-export function calcBreakEvenRate(
-  inputs:          InvestmentInputs,
-  targetNetValue:  number,
-): number | null {
-  if (targetNetValue <= 0) return 0
-
-  const MAX_RATE = 100
-
-  if (calculateInvestment({ ...inputs, annualReturn: MAX_RATE }).netValue < targetNetValue) {
-    return null
-  }
-  if (calculateInvestment({ ...inputs, annualReturn: 0 }).netValue >= targetNetValue) {
-    return 0
-  }
-
-  let lo = 0
-  let hi = MAX_RATE
-
-  for (let i = 0; i < 60; i++) {
-    const mid = (lo + hi) / 2
-    if (calculateInvestment({ ...inputs, annualReturn: mid }).netValue < targetNetValue) {
-      lo = mid
-    } else {
-      hi = mid
-    }
-    if (hi - lo < 0.001) break
-  }
-
-  return Math.round((lo + hi) / 2 * 10) / 10   // round to 1 decimal place
-}
-
-// ---------------------------------------------------------------------------
 // Sensitivity table
 // annualReturn in inputs is ignored — rates[] overrides it.
 // ---------------------------------------------------------------------------
