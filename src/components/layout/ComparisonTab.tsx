@@ -4,8 +4,9 @@
  * Disabled checkboxes for mixes with no tracks.
  */
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useMix } from '@/store/useMixStore'
+import { useComparisonStore } from '@/store/useComparisonStore'
 import { calculateMix } from '@/engine/calculateMix'
 import { ComparisonChart } from '@/components/outputs/charts/ComparisonChart'
 import { ComparisonBalanceChart } from '@/components/outputs/charts/ComparisonBalanceChart'
@@ -117,24 +118,13 @@ export function ComparisonTab() {
     ['c', mixC.tracks.length > 0],
   ])
 
-  // Start with all non-empty mixes selected (at most 2 on first render to match
-  // the original two-mix experience; if all three are full, show all three)
-  const [selected, setSelected] = useState<Set<MixId>>(() => {
-    const init = new Set<MixId>()
-    if (mixA.tracks.length > 0) init.add('a')
-    if (mixB.tracks.length > 0) init.add('b')
-    if (mixC.tracks.length > 0) init.add('c')
-    return init
-  })
+  // Persisted so the selection survives navigating away and back instead of
+  // resetting to "every non-empty mix" on every remount.
+  const selectedIds = useComparisonStore((s) => s.selected)
+  const toggle       = useComparisonStore((s) => s.toggle)
+  const selected     = useMemo(() => new Set(selectedIds), [selectedIds])
 
-  const handleToggle = (id: MixId, checked: boolean) => {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (checked) next.add(id)
-      else next.delete(id)
-      return next
-    })
-  }
+  const handleToggle = (id: MixId, checked: boolean) => toggle(id, checked)
 
   // Calculate results for all three mixes (cached separately)
   const resultA = useMemo(
