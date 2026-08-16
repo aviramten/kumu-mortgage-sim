@@ -6,15 +6,11 @@
  *
  * Layout: split panel (RTL)
  *   Right column → inputs (mortgage-savings comparison + investment parameters)
- *   Left  column → outputs (break-even card, KPI row, chart, sensitivity table)
+ *   Left  column → outputs (KPI row, sensitivity table)
  */
 
 import { useState, useMemo } from 'react'
 import { TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react'
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer,
-} from 'recharts'
 import { useThemeStore }  from '@/store/useThemeStore'
 import { useInvestmentStore } from '@/store/useInvestmentStore'
 import { useNumericField } from '@/hooks/useNumericField'
@@ -23,11 +19,6 @@ import {
   buildSensitivityTable,
 } from '@/engine/calculateInvestment'
 import type { SensitivityRow } from '@/engine/calculateInvestment'
-import {
-  MIX_A_COLOR,
-  getChartTooltipStyle, getChartAxisStyle,
-  CHART_GRID_COLOR_LIGHT, CHART_GRID_COLOR_DARK,
-} from '@/utils/chartTheme'
 import { formatCurrencyWhole } from '@/utils/format'
 
 // ---------------------------------------------------------------------------
@@ -35,43 +26,6 @@ import { formatCurrencyWhole } from '@/utils/format'
 // ---------------------------------------------------------------------------
 
 const SENSITIVITY_RATES = [4, 6, 8, 10]
-
-// ---------------------------------------------------------------------------
-// Spitzer savings curve
-// Approximates cumulative interest saved using a fixed 5% rate for curve shape.
-// ---------------------------------------------------------------------------
-function buildSpitzerSavingsCurve(totalSavings: number, years: number): Map<number, number> {
-  const result = new Map<number, number>()
-  if (totalSavings <= 0 || years <= 0) return result
-
-  const N = years * 12
-  const r = 0.05 / 12
-
-  const discountFactor = 1 - Math.pow(1 + r, -N)
-  const paymentFactor  = r / discountFactor
-  const interestFactor = paymentFactor * N - 1
-
-  if (interestFactor <= 0) return result
-
-  const principal      = totalSavings / interestFactor
-  const monthlyPayment = principal * paymentFactor
-
-  let balance            = principal
-  let cumulativeInterest = 0
-
-  for (let m = 1; m <= N; m++) {
-    const interestPmt   = balance * r
-    const principalPmt  = monthlyPayment - interestPmt
-    cumulativeInterest += interestPmt
-    balance             = Math.max(0, balance - principalPmt)
-
-    if (m % 12 === 0) {
-      result.set(m / 12, Math.round(cumulativeInterest))
-    }
-  }
-
-  return result
-}
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -197,31 +151,6 @@ function KpiCard({ label, value, sub, accent }: { label: string; value: string; 
   )
 }
 
-function CustomTooltip({
-  active, payload, label, isDark,
-}: {
-  active?: boolean
-  payload?: { name: string; value: number; color: string }[]
-  label?: number
-  isDark: boolean
-}) {
-  if (!active || !payload?.length) return null
-  return (
-    <div style={getChartTooltipStyle(isDark)}>
-      <p className="font-semibold text-[12px] mb-1.5" style={{ color: isDark ? '#F4F7FB' : '#1A2456' }}>
-        שנה {label ?? 0}
-      </p>
-      {payload.map((p) => (
-        <div key={p.name} className="flex items-center gap-2 text-[12px]">
-          <span className="w-2 h-2 rounded-full inline-block" style={{ background: p.color }} />
-          <span style={{ color: isDark ? '#A5B8FF' : '#6B7280' }}>{p.name}:</span>
-          <span style={{ color: isDark ? '#F4F7FB' : '#1A2456' }}>{formatCurrencyWhole(p.value)}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function SensitivityTable({
   rows,
   isDark,
@@ -325,39 +254,12 @@ export function InvestmentTab() {
      inputs.capitalGainsTax, comparisonAmount, hasComparison],
   )
 
-  // Chart data — the mortgage-savings curve runs over its own comparison
-  // period, independent of the investment horizon (inputs.years).
-  const savingsCurve = useMemo(
-    () => buildSpitzerSavingsCurve(comparisonAmount, comparisonYears),
-    [comparisonAmount, comparisonYears],
-  )
-
-  // Spans the longer of the two periods, so neither curve gets silently cut
-  // off when the investment horizon and the mortgage-comparison period differ.
-  const chartData = useMemo(() => {
-    const portfolioByYear = new Map(investResult.yearlyPortfolio.map((p) => [p.year, p.value]))
-    const maxYear = Math.max(inputs.years, hasComparison ? comparisonYears : 0)
-    const data: { year: number; portfolio: number | null; mortgageSavings: number | null }[] = []
-    for (let year = 1; year <= maxYear; year++) {
-      const portfolio = portfolioByYear.get(year)
-      data.push({
-        year,
-        portfolio:       portfolio !== undefined ? Math.round(portfolio) : null,
-        mortgageSavings: hasComparison ? (savingsCurve.get(year) ?? null) : null,
-      })
-    }
-    return data
-  }, [investResult.yearlyPortfolio, inputs.years, savingsCurve, comparisonYears, hasComparison])
-
   // Comparison summary
   const netDiff   = investResult.netValue - comparisonAmount
   const CompIcon  = netDiff > 0 ? TrendingUp : netDiff < 0 ? TrendingDown : Minus
   const compAccent = netDiff > 0
     ? 'text-kumu-green'
     : netDiff < 0 ? 'text-kumu-coral' : 'text-kumu-blue'
-
-  const axisStyle = getChartAxisStyle(isDark)
-  const gridColor = isDark ? CHART_GRID_COLOR_DARK : CHART_GRID_COLOR_LIGHT
 
   // Recommendation text
   function getRecommendation(): string {
@@ -507,100 +409,6 @@ export function InvestmentTab() {
                 value={formatCurrencyWhole(Math.max(0, investResult.netProfit))}
                 sub="מעבר לקרן, אחרי מס"
               />
-            </div>
-          )}
-
-          {/* Area chart */}
-          {chartData.length > 0 && (
-            <div className="rounded-xl border border-gray-100 dark:border-kumu-navy-light bg-white dark:bg-kumu-surface-dark overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 dark:border-kumu-navy-light">
-                <h3 className="text-xs font-semibold uppercase tracking-widest text-kumu-blue dark:text-kumu-blue-lighter">
-                  צמיחת תיק ההשקעות לאורך הזמן
-                </h3>
-              </div>
-              <div className="p-3">
-                <ResponsiveContainer width="100%" height={200}>
-                  <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="gradPortfolio" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor={MIX_A_COLOR} stopOpacity={0.18} />
-                        <stop offset="95%" stopColor={MIX_A_COLOR} stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
-
-                    <XAxis
-                      dataKey="year"
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ ...axisStyle, fontSize: 10 }}
-                      tickFormatter={(y: number) => `${y}ש'`}
-                      interval={Math.max(0, Math.floor(chartData.length / 8) - 1)}
-                    />
-
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ ...axisStyle, fontSize: 10 }}
-                      tickFormatter={(v: number) => `₪${Math.round(v / 1_000)}K`}
-                      width={52}
-                    />
-
-                    <Tooltip
-                      content={(props) => (
-                        <CustomTooltip
-                          active={props.active}
-                          payload={props.payload as unknown as { name: string; value: number; color: string }[]}
-                          label={props.label as number}
-                          isDark={isDark}
-                        />
-                      )}
-                    />
-
-                    <Legend
-                      formatter={(v) => (
-                        <span style={{ fontFamily: 'Heebo, sans-serif', fontSize: 11, color: axisStyle.fill }}>
-                          {v}
-                        </span>
-                      )}
-                    />
-
-                    <Area
-                      type="monotone"
-                      dataKey="portfolio"
-                      name="ערך תיק (ברוטו)"
-                      stroke={MIX_A_COLOR}
-                      strokeWidth={2.5}
-                      fill="url(#gradPortfolio)"
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 0 }}
-                      isAnimationActive={false}
-                    />
-
-                    {hasComparison && (
-                      <Area
-                        type="monotone"
-                        dataKey="mortgageSavings"
-                        name="חסכון במשכנתא (משוער)"
-                        stroke="#E87A5D"
-                        strokeWidth={2}
-                        strokeDasharray="6 3"
-                        fill="none"
-                        dot={false}
-                        activeDot={{ r: 4, strokeWidth: 0 }}
-                        isAnimationActive={false}
-                        connectNulls
-                      />
-                    )}
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-              {hasComparison && (
-                <p className="px-4 pb-3 text-[10px] text-kumu-navy-light dark:text-kumu-blue-lighter/80 leading-snug">
-                  * עקומת החסכון במשכנתא היא אומדן גס המבוסס על לוח שפיצר ב-5% ואינה מחושבת לפי פרמטרי התמהיל שלכם.
-                </p>
-              )}
             </div>
           )}
 
